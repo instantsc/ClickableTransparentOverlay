@@ -9,7 +9,7 @@ public class State
     public bool ShowClickableMenu = true;
     public bool ShowOverlaySample1 = true;
     public bool ShowImGuiDemo = false;
-    public int[] resizeHelper = new int[4] { 0, 0, 2560, 1440 };
+    public int[] ResizeHelper = new int[4] { 0, 0, 2560, 1440 };
     public int Seconds = 5;
     public int CurrentDisplay = 0;
     public bool IsRunning = true;

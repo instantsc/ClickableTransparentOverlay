@@ -14,11 +14,11 @@ public static class Utils
     /// </summary>
     internal static bool IsClickable { get; private set; } = true;
 
-    private static User32.WindowStylesEx Clickable = 0;
-    private static User32.WindowStylesEx NotClickable = 0;
+    private static User32.WindowStylesEx _clickable = 0;
+    private static User32.WindowStylesEx _notClickable = 0;
 
     private static readonly Stopwatch sw = Stopwatch.StartNew();
-    private static readonly long[] nVirtKeyTimeouts = new long[256]; // Total VirtKeys are 256.
+    private static readonly long[] NVirtKeyTimeouts = new long[256]; // Total VirtKeys are 256.
 
     /// <summary>
     /// Returns true if the key is pressed.
@@ -52,9 +52,9 @@ public static class Utils
     {
         var actual = IsKeyPressed(nVirtKey);
         var currTime = sw.ElapsedMilliseconds;
-        if (actual && currTime > nVirtKeyTimeouts[(int)nVirtKey])
+        if (actual && currTime > NVirtKeyTimeouts[(int)nVirtKey])
         {
-            nVirtKeyTimeouts[(int)nVirtKey] = currTime + timeout;
+            NVirtKeyTimeouts[(int)nVirtKey] = currTime + timeout;
             return true;
         }
 
@@ -69,8 +69,8 @@ public static class Utils
     /// </param>
     internal static void InitTransparency(IntPtr handle)
     {
-        Clickable = (User32.WindowStylesEx)User32.GetWindowLongPtr(handle, User32.WindowLongFlags.GWL_EXSTYLE);
-        NotClickable = Clickable | User32.WindowStylesEx.WS_EX_LAYERED | User32.WindowStylesEx.WS_EX_TRANSPARENT;
+        _clickable = (User32.WindowStylesEx)User32.GetWindowLongPtr(handle, User32.WindowLongFlags.GWL_EXSTYLE);
+        _notClickable = _clickable | User32.WindowStylesEx.WS_EX_LAYERED | User32.WindowStylesEx.WS_EX_TRANSPARENT;
         var margins = new DwmApi.MARGINS(-1);
         DwmApi.DwmExtendFrameIntoClientArea(handle, in margins);
         SetOverlayClickable(handle, true);
@@ -81,22 +81,22 @@ public static class Utils
     /// NOTE: This function depends on InitTransparency being called when the Window was created.
     /// </summary>
     /// <param name="handle">Veldrid window handle in IntPtr format.</param>
-    /// <param name="WantClickable">Set to true if you want to make the window clickable otherwise false.</param>
-    internal static void SetOverlayClickable(IntPtr handle, bool WantClickable)
+    /// <param name="wantClickable">Set to true if you want to make the window clickable otherwise false.</param>
+    internal static void SetOverlayClickable(IntPtr handle, bool wantClickable)
     {
-        if (IsClickable ^ WantClickable)
+        if (IsClickable ^ wantClickable)
         {
-            if (WantClickable)
+            if (wantClickable)
             {
-                User32.SetWindowLong(handle, User32.WindowLongFlags.GWL_EXSTYLE, (int)Clickable);
+                User32.SetWindowLong(handle, User32.WindowLongFlags.GWL_EXSTYLE, (int)_clickable);
                 User32.SetFocus(handle);
             }
             else
             {
-                User32.SetWindowLong(handle, User32.WindowLongFlags.GWL_EXSTYLE, (int)NotClickable);
+                User32.SetWindowLong(handle, User32.WindowLongFlags.GWL_EXSTYLE, (int)_notClickable);
             }
 
-            IsClickable = WantClickable;
+            IsClickable = wantClickable;
         }
     }
 }

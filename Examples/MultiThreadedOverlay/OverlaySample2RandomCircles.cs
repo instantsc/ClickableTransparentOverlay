@@ -7,8 +7,8 @@ namespace MultiThreadedOverlay;
 public class OverlaySample2RandomCircles
 {
     public bool Show = false;
-    private static Random randomGen = new Random();
-    private Vector2[] circleCenters = new Vector2[200];
+    private static Random _randomGen = new Random();
+    private Vector2[] _circleCenters = new Vector2[200];
 
     public void Update()
     {
@@ -17,10 +17,10 @@ public class OverlaySample2RandomCircles
             return;
         }
 
-        for (int i = 0; i < circleCenters.Length; i++)
+        for (var i = 0; i < _circleCenters.Length; i++)
         {
-            circleCenters[i].X = randomGen.Next(0, 2560);
-            circleCenters[i].Y = randomGen.Next(0, 1440);
+            _circleCenters[i].X = _randomGen.Next(0, 2560);
+            _circleCenters[i].Y = _randomGen.Next(0, 1440);
         }
     }
 
@@ -41,9 +41,9 @@ public class OverlaySample2RandomCircles
             ImGuiWindowFlags.NoResize |
             ImGuiWindowFlags.NoTitleBar);
         var windowPtr = ImGui.GetWindowDrawList();
-        for (int i = 0; i < circleCenters.Length; i++)
+        foreach (var center in _circleCenters)
         {
-            windowPtr.AddCircleFilled(circleCenters[i], 10.0f, (uint)(((255 << 24) | (00 << 16) | (00 << 8) | 255) & 0xffffffffL));
+            windowPtr.AddCircleFilled(center, 10.0f, (uint)(((255 << 24) | (00 << 16) | (00 << 8) | 255) & 0xffffffffL));
         }
 
         ImGui.End();

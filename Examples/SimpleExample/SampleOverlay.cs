@@ -5,7 +5,7 @@ namespace SimpleExample;
 
 internal class SampleOverlay : Overlay
 {
-    private bool wantKeepDemoWindow = true;
+    private bool _wantKeepDemoWindow = true;
 
     protected override Task PostInitialized()
     {
@@ -14,8 +14,8 @@ internal class SampleOverlay : Overlay
 
     protected override void Render()
     {
-        ImGui.ShowDemoWindow(ref wantKeepDemoWindow);
-        if (!wantKeepDemoWindow)
+        ImGui.ShowDemoWindow(ref _wantKeepDemoWindow);
+        if (!_wantKeepDemoWindow)
         {
             Close();
         }

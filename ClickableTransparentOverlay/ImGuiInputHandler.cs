@@ -7,27 +7,27 @@ namespace ClickableTransparentOverlay;
 
 internal class ImGuiInputHandler
 {
-    readonly IntPtr hwnd;
-    ImGuiMouseCursor lastCursor;
+    private readonly IntPtr _hwnd;
+    private ImGuiMouseCursor _lastCursor;
 
     public ImGuiInputHandler(IntPtr hwnd)
     {
-        this.hwnd = hwnd;
+        _hwnd = hwnd;
     }
 
     public bool Update()
     {
         var io = ImGui.GetIO();
         UpdateKeyModifiers(io);
-        UpdateMousePosition(io, hwnd);
+        UpdateMousePosition(io, _hwnd);
         var mouseCursor = io.MouseDrawCursor ? ImGuiMouseCursor.None : ImGui.GetMouseCursor();
-        if (mouseCursor != lastCursor)
+        if (mouseCursor != _lastCursor)
         {
-            lastCursor = mouseCursor;
+            _lastCursor = mouseCursor;
 
             // only required if mouse icon changes
-            // while mouse isn't moved otherwise redundent.
-            // so practically it's redundent.
+            // while mouse isn't moved otherwise redundant.
+            // so practically it's redundant.
             UpdateMouseCursor(io, mouseCursor);
         }
 
@@ -65,19 +65,19 @@ internal class ImGuiInputHandler
                     msg != WindowMessage.XButtonUp);
                 break;
             case WindowMessage.MouseWheel:
-                io.AddMouseWheelEvent(0.0f, GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA);
+                io.AddMouseWheelEvent(0.0f, GET_WHEEL_DELTA_WPARAM(wParam) / WheelDelta);
                 break;
             case WindowMessage.MouseHWheel:
-                io.AddMouseWheelEvent(GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA, 0.0f);
+                io.AddMouseWheelEvent(GET_WHEEL_DELTA_WPARAM(wParam) / WheelDelta, 0.0f);
                 break;
             case WindowMessage.KeyDown:
             case WindowMessage.SysKeyDown:
             case WindowMessage.KeyUp:
             case WindowMessage.SysKeyUp:
-                bool is_key_down = msg == WindowMessage.SysKeyDown || msg == WindowMessage.KeyDown;
-                if ((ulong)wParam < 256 && TryMapKey((VK)wParam, out ImGuiKey imguikey))
+                var isKeyDown = msg == WindowMessage.SysKeyDown || msg == WindowMessage.KeyDown;
+                if ((ulong)wParam < 256 && TryMapKey((VK)wParam, out var imguikey))
                 {
-                    io.AddKeyEvent(imguikey, is_key_down);
+                    io.AddKeyEvent(imguikey, isKeyDown);
                 }
 
                 break;
@@ -88,7 +88,7 @@ internal class ImGuiInputHandler
                 if (Utils.Loword((int)(long)lParam) == 1)
                 {
                     var mouseCursor = io.MouseDrawCursor ? ImGuiMouseCursor.None : ImGui.GetMouseCursor();
-                    lastCursor = mouseCursor;
+                    _lastCursor = mouseCursor;
                     if (UpdateMouseCursor(io, mouseCursor))
                     {
                         return true;
@@ -150,18 +150,18 @@ internal class ImGuiInputHandler
 
     private static bool TryMapKey(VK key, out ImGuiKey result)
     {
-        static ImGuiKey keyToImGuiKeyShortcut(VK keyToConvert, VK startKey1, ImGuiKey startKey2)
+        static ImGuiKey KeyToImGuiKeyShortcut(VK keyToConvert, VK startKey1, ImGuiKey startKey2)
         {
-            int changeFromStart1 = (int)keyToConvert - (int)startKey1;
+            var changeFromStart1 = (int)keyToConvert - (int)startKey1;
             return startKey2 + changeFromStart1;
         }
 
         result = key switch
         {
-            >= VK.F1 and <= VK.F12 => keyToImGuiKeyShortcut(key, VK.F1, ImGuiKey.F1),
-            >= VK.NUMPAD0 and <= VK.NUMPAD9 => keyToImGuiKeyShortcut(key, VK.NUMPAD0, ImGuiKey.Keypad0),
-            >= VK.KEY_A and <= VK.KEY_Z => keyToImGuiKeyShortcut(key, VK.KEY_A, ImGuiKey.A),
-            >= VK.KEY_0 and <= VK.KEY_9 => keyToImGuiKeyShortcut(key, VK.KEY_0, ImGuiKey._0),
+            >= VK.F1 and <= VK.F12 => KeyToImGuiKeyShortcut(key, VK.F1, ImGuiKey.F1),
+            >= VK.NUMPAD0 and <= VK.NUMPAD9 => KeyToImGuiKeyShortcut(key, VK.NUMPAD0, ImGuiKey.Keypad0),
+            >= VK.KEY_A and <= VK.KEY_Z => KeyToImGuiKeyShortcut(key, VK.KEY_A, ImGuiKey.A),
+            >= VK.KEY_0 and <= VK.KEY_9 => KeyToImGuiKeyShortcut(key, VK.KEY_0, ImGuiKey._0),
             VK.TAB => ImGuiKey.Tab,
             VK.LEFT => ImGuiKey.LeftArrow,
             VK.RIGHT => ImGuiKey.RightArrow,
@@ -213,7 +213,7 @@ internal class ImGuiInputHandler
         return result != ImGuiKey.None;
     }
 
-    private static readonly float WHEEL_DELTA = 120;
+    private static readonly float WheelDelta = 120;
 
     private static int GET_WHEEL_DELTA_WPARAM(IntPtr wParam) => Utils.Hiword((int)(uint)(ulong)wParam);
 

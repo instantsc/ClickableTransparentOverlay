@@ -24,32 +24,32 @@ namespace ClickableTransparentOverlay;
 /// </summary>
 public abstract class Overlay : IDisposable
 {
-    private readonly string title;
-    private readonly Format format;
+    private readonly string _title;
+    private readonly Format _format = Format.R8G8B8A8_UNorm;
 
-    private Win32Window window;
-    private ID3D11Device device;
-    private ID3D11DeviceContext deviceContext;
-    private IDXGISwapChain swapChain;
-    private ID3D11Texture2D backBuffer;
-    private ID3D11RenderTargetView renderView;
+    private Win32Window _window;
+    private ID3D11Device _device;
+    private ID3D11DeviceContext _deviceContext;
+    private IDXGISwapChain _swapChain;
+    private ID3D11Texture2D _backBuffer;
+    private ID3D11RenderTargetView _renderView;
 
-    private ImGuiRenderer renderer;
-    private ImGuiInputHandler inputhandler;
+    private ImGuiRenderer _renderer;
+    private ImGuiInputHandler _inputhandler;
 
-    private bool _disposedValue;
-    private IntPtr selfPointer;
-    private Thread renderThread;
-    private volatile CancellationTokenSource cancellationTokenSource;
-    private volatile bool overlayIsReady;
+    private bool _disposedValue = false;
+    private IntPtr _selfPointer;
+    private Thread _renderThread;
+    private volatile CancellationTokenSource _cancellationTokenSource = new();
+    private volatile bool _overlayIsReady = false;
 
-    private bool replaceFont = false;
-    private ushort[]? fontCustomGlyphRange;
-    private string fontPathName;
-    private float fontSize;
-    private FontGlyphRangeType fontLanguage;
+    private bool _replaceFont = false;
+    private ushort[]? _fontCustomGlyphRange;
+    private string _fontPathName;
+    private float _fontSize;
+    private FontGlyphRangeType _fontLanguage;
 
-    private Dictionary<string, (IntPtr Handle, uint Width, uint Height)> loadedTexturesPtrs;
+    private Dictionary<string, (IntPtr Handle, uint Width, uint Height)> _loadedTexturesPtrs = new();
 
     #region Constructors
 
@@ -73,10 +73,10 @@ public abstract class Overlay : IDisposable
     /// <summary>
     /// Initializes a new instance of the <see cref="Overlay"/> class.
     /// </summary>
-    /// <param name="DPIAware">
+    /// <param name="dpiAware">
     /// should the overlay scale with windows scale value or not.
     /// </param>
-    public Overlay(bool DPIAware) : this("Overlay", DPIAware)
+    public Overlay(bool dpiAware) : this("Overlay", dpiAware)
     {
     }
 
@@ -86,19 +86,13 @@ public abstract class Overlay : IDisposable
     /// <param name="windowTitle">
     /// Title of the window created by the overlay
     /// </param>
-    /// <param name="DPIAware">
+    /// <param name="dpiAware">
     /// should the overlay scale with windows scale value or not.
     /// </param>
-    public Overlay(string windowTitle, bool DPIAware)
+    public Overlay(string windowTitle, bool dpiAware)
     {
-        VSync = true;
-        _disposedValue = false;
-        overlayIsReady = false;
-        title = windowTitle;
-        cancellationTokenSource = new();
-        format = Format.R8G8B8A8_UNorm;
-        loadedTexturesPtrs = new();
-        if (DPIAware)
+        _title = windowTitle;
+        if (dpiAware)
         {
             User32.SetProcessDPIAware();
         }
@@ -114,17 +108,17 @@ public abstract class Overlay : IDisposable
     /// <returns>A Task that finishes once the overlay window is ready</returns>
     public async Task Start()
     {
-        renderThread = new Thread(async () =>
+        _renderThread = new Thread(() =>
         {
             D3D11.D3D11CreateDevice(null, DriverType.Hardware, DeviceCreationFlags.None,
-                new[] { FeatureLevel.Level_10_0 }, out device, out deviceContext);
-            selfPointer = Kernel32.GetModuleHandle().ReleaseOwnership();
+                new[] { FeatureLevel.Level_10_0 }, out _device, out _deviceContext);
+            _selfPointer = Kernel32.GetModuleHandle().ReleaseOwnership();
             var wndClass = new User32.WNDCLASSEX
             {
                 cbSize = (uint)Unsafe.SizeOf<User32.WNDCLASSEX>(),
                 style = User32.WindowClassStyles.CS_HREDRAW | User32.WindowClassStyles.CS_VREDRAW | User32.WindowClassStyles.CS_PARENTDC,
                 lpfnWndProc = WndProc,
-                hInstance = selfPointer,
+                hInstance = _selfPointer,
                 hCursor = User32.LoadCursor(IntPtr.Zero, (int)SystemCursor.IDC_ARROW),
                 hbrBackground = IntPtr.Zero,
                 hIcon = IntPtr.Zero,
@@ -132,20 +126,20 @@ public abstract class Overlay : IDisposable
             };
 
             User32.RegisterClassEx(wndClass);
-            window = new Win32Window(wndClass.lpszClassName, 800, 600, 0, 0, title,
+            _window = new Win32Window(wndClass.lpszClassName, 800, 600, 0, 0, _title,
                 User32.WindowStyles.WS_POPUP, User32.WindowStylesEx.WS_EX_ACCEPTFILES | User32.WindowStylesEx.WS_EX_TOPMOST);
-            renderer = new ImGuiRenderer(device, deviceContext, 800, 600);
-            inputhandler = new ImGuiInputHandler(window.Handle);
-            overlayIsReady = true;
-            await PostInitialized();
-            User32.ShowWindow(window.Handle, ShowWindowCommand.SW_MAXIMIZE);
-            Utils.InitTransparency(window.Handle);
-            renderer.Start();
-            RunInfiniteLoop(cancellationTokenSource.Token);
+            _renderer = new ImGuiRenderer(_device, _deviceContext, 800, 600);
+            _inputhandler = new ImGuiInputHandler(_window.Handle);
+            _overlayIsReady = true;
+            Task.Run(PostInitialized).Wait();
+            User32.ShowWindow(_window.Handle, ShowWindowCommand.SW_MAXIMIZE);
+            Utils.InitTransparency(_window.Handle);
+            _renderer.Start();
+            RunInfiniteLoop(_cancellationTokenSource.Token);
         });
 
-        renderThread.Start();
-        await WaitHelpers.SpinWait(() => overlayIsReady);
+        _renderThread.Start();
+        await WaitHelpers.SpinWait(() => _overlayIsReady);
     }
 
     /// <summary>
@@ -154,12 +148,12 @@ public abstract class Overlay : IDisposable
     /// <returns>A task that finishes once the overlay window closes</returns>
     public virtual async Task Run()
     {
-        if (!overlayIsReady)
+        if (!_overlayIsReady)
         {
             await Start();
         }
 
-        await WaitHelpers.SpinWait(() => cancellationTokenSource.IsCancellationRequested);
+        await WaitHelpers.SpinWait(() => _cancellationTokenSource.IsCancellationRequested);
     }
 
     /// <summary>
@@ -167,7 +161,7 @@ public abstract class Overlay : IDisposable
     /// </summary>
     public virtual void Close()
     {
-        cancellationTokenSource.Cancel();
+        _cancellationTokenSource.Cancel();
     }
 
     /// <summary>
@@ -193,11 +187,11 @@ public abstract class Overlay : IDisposable
             return false;
         }
 
-        fontPathName = pathName;
-        fontSize = size;
-        fontLanguage = language;
-        replaceFont = true;
-        fontCustomGlyphRange = null;
+        _fontPathName = pathName;
+        _fontSize = size;
+        _fontLanguage = language;
+        _replaceFont = true;
+        _fontCustomGlyphRange = null;
         return true;
     }
 
@@ -215,31 +209,31 @@ public abstract class Overlay : IDisposable
             return false;
         }
 
-        fontPathName = pathName;
-        fontSize = size;
-        fontCustomGlyphRange = glyphRange;
-        replaceFont = true;
+        _fontPathName = pathName;
+        _fontSize = size;
+        _fontCustomGlyphRange = glyphRange;
+        _replaceFont = true;
         return true;
     }
 
     /// <summary>
     /// Enable or disable the vsync on the overlay.
     /// </summary>
-    public bool VSync;
+    public bool VSync = true;
 
     /// <summary>
     /// Gets or sets the position of the overlay window.
     /// </summary>
     public Point Position
     {
-        get { return window.Dimensions.Location; }
+        get => _window.Dimensions.Location;
 
         set
         {
-            if (window.Dimensions.Location != value)
+            if (_window.Dimensions.Location != value)
             {
-                User32.MoveWindow(window.Handle, value.X, value.Y, window.Dimensions.Width, window.Dimensions.Width, true);
-                window.Dimensions.Location = value;
+                User32.MoveWindow(_window.Handle, value.X, value.Y, _window.Dimensions.Width, _window.Dimensions.Width, true);
+                _window.Dimensions.Location = value;
             }
         }
     }
@@ -249,13 +243,13 @@ public abstract class Overlay : IDisposable
     /// </summary>
     public Size Size
     {
-        get { return window.Dimensions.Size; }
+        get => _window.Dimensions.Size;
         set
         {
-            if (window.Dimensions.Size != value)
+            if (_window.Dimensions.Size != value)
             {
-                User32.MoveWindow(window.Handle, window.Dimensions.X, window.Dimensions.X, value.Width, value.Height, true);
-                window.Dimensions.Size = value;
+                User32.MoveWindow(_window.Handle, _window.Dimensions.X, _window.Dimensions.X, value.Width, value.Height, true);
+                _window.Dimensions.Size = value;
             }
         }
     }
@@ -263,10 +257,7 @@ public abstract class Overlay : IDisposable
     /// <summary>
     /// Gets the number of displays available on the computer.
     /// </summary>
-    public static int NumberVideoDisplays
-    {
-        get { return User32.GetSystemMetrics(User32.SystemMetric.SM_CMONITORS); }
-    }
+    public static int NumberVideoDisplays => User32.GetSystemMetrics(User32.SystemMetric.SM_CMONITORS);
 
     /// <summary>
     /// Adds the image to the Graphic Device as a texture.
@@ -281,7 +272,7 @@ public abstract class Overlay : IDisposable
     /// <param name="height">height of the loaded texture.</param>
     public void AddOrGetImagePointer(string filePath, bool srgb, out IntPtr handle, out uint width, out uint height)
     {
-        if (loadedTexturesPtrs.TryGetValue(filePath, out var data))
+        if (_loadedTexturesPtrs.TryGetValue(filePath, out var data))
         {
             handle = data.Handle;
             width = data.Width;
@@ -292,10 +283,10 @@ public abstract class Overlay : IDisposable
             var configuration = Configuration.Default.Clone();
             configuration.PreferContiguousImageBuffers = true;
             using var image = Image.Load<Rgba32>(configuration, filePath);
-            handle = renderer.CreateImageTexture(image, srgb ? Format.R8G8B8A8_UNorm_SRgb : Format.R8G8B8A8_UNorm);
+            handle = _renderer.CreateImageTexture(image, srgb ? Format.R8G8B8A8_UNorm_SRgb : Format.R8G8B8A8_UNorm);
             width = (uint)image.Width;
             height = (uint)image.Height;
-            loadedTexturesPtrs.Add(filePath, new(handle, width, height));
+            _loadedTexturesPtrs.Add(filePath, (handle, width, height));
         }
     }
 
@@ -311,14 +302,14 @@ public abstract class Overlay : IDisposable
     /// <param name="handle">output pointer to the image in the graphic device.</param>
     public void AddOrGetImagePointer(string name, Image<Rgba32> image, bool srgb, out IntPtr handle)
     {
-        if (loadedTexturesPtrs.TryGetValue(name, out var data))
+        if (_loadedTexturesPtrs.TryGetValue(name, out var data))
         {
             handle = data.Handle;
         }
         else
         {
-            handle = renderer.CreateImageTexture(image, srgb ? Format.R8G8B8A8_UNorm_SRgb : Format.R8G8B8A8_UNorm);
-            loadedTexturesPtrs.Add(name, new(handle, (uint)image.Width, (uint)image.Height));
+            handle = _renderer.CreateImageTexture(image, srgb ? Format.R8G8B8A8_UNorm_SRgb : Format.R8G8B8A8_UNorm);
+            _loadedTexturesPtrs.Add(name, (handle, (uint)image.Width, (uint)image.Height));
         }
     }
 
@@ -329,9 +320,9 @@ public abstract class Overlay : IDisposable
     /// <returns> true if the image is removed otherwise false.</returns>
     public bool RemoveImage(string key)
     {
-        if (loadedTexturesPtrs.Remove(key, out var data))
+        if (_loadedTexturesPtrs.Remove(key, out var data))
         {
-            return renderer.RemoveImageTexture(data.Handle);
+            return _renderer.RemoveImageTexture(data.Handle);
         }
 
         return false;
@@ -348,26 +339,26 @@ public abstract class Overlay : IDisposable
 
         if (disposing)
         {
-            renderThread?.Join();
-            foreach (var key in loadedTexturesPtrs.Keys.ToArray())
+            _renderThread?.Join();
+            foreach (var key in _loadedTexturesPtrs.Keys.ToArray())
             {
                 RemoveImage(key);
             }
 
-            cancellationTokenSource?.Dispose();
-            swapChain?.Release();
-            backBuffer?.Release();
-            renderView?.Release();
-            renderer?.Dispose();
-            window?.Dispose();
-            deviceContext?.Release();
-            device?.Release();
+            _cancellationTokenSource?.Dispose();
+            _swapChain?.Release();
+            _backBuffer?.Release();
+            _renderView?.Release();
+            _renderer?.Dispose();
+            _window?.Dispose();
+            _deviceContext?.Release();
+            _device?.Release();
         }
 
-        if (selfPointer != IntPtr.Zero)
+        if (_selfPointer != IntPtr.Zero)
         {
-            _ = User32.UnregisterClass(title, selfPointer);
-            selfPointer = IntPtr.Zero;
+            _ = User32.UnregisterClass(_title, _selfPointer);
+            _selfPointer = IntPtr.Zero;
         }
 
         _disposedValue = true;
@@ -390,74 +381,65 @@ public abstract class Overlay : IDisposable
     private void RunInfiniteLoop(CancellationToken token)
     {
         var stopwatch = Stopwatch.StartNew();
-        float deltaTime = 0f;
         var clearColor = new Color4(0.0f);
         while (!token.IsCancellationRequested)
         {
-            deltaTime = stopwatch.ElapsedTicks / (float)Stopwatch.Frequency;
+            var deltaTime = stopwatch.ElapsedTicks / (float)Stopwatch.Frequency;
             stopwatch.Restart();
-            window.PumpEvents();
-            Utils.SetOverlayClickable(window.Handle, inputhandler.Update());
-            renderer.Update(deltaTime, () => { Render(); });
-            deviceContext.OMSetRenderTargets(renderView);
-            deviceContext.ClearRenderTargetView(renderView, clearColor);
-            renderer.Render();
-            if (VSync)
-            {
-                swapChain.Present(1, PresentFlags.None); // Present with vsync
-            }
-            else
-            {
-                swapChain.Present(0, PresentFlags.None); // Present without vsync
-            }
-
+            _window.PumpEvents();
+            Utils.SetOverlayClickable(_window.Handle, _inputhandler.Update());
+            _renderer.Update(deltaTime, Render);
+            _deviceContext.OMSetRenderTargets(_renderView);
+            _deviceContext.ClearRenderTargetView(_renderView, clearColor);
+            _renderer.Render();
+            _swapChain.Present(VSync ? 1 : 0, PresentFlags.None);
             ReplaceFontIfRequired();
         }
     }
 
     private void ReplaceFontIfRequired()
     {
-        if (replaceFont && renderer != null)
+        if (_replaceFont && _renderer != null)
         {
-            renderer.UpdateFontTexture(fontPathName, fontSize, fontCustomGlyphRange, fontLanguage);
-            replaceFont = false;
+            _renderer.UpdateFontTexture(_fontPathName, _fontSize, _fontCustomGlyphRange, _fontLanguage);
+            _replaceFont = false;
         }
     }
 
     private void OnResize()
     {
-        if (renderView == null) //first show
+        if (_renderView == null) //first show
         {
-            using var dxgiFactory = device.QueryInterface<IDXGIDevice>().GetParent<IDXGIAdapter>().GetParent<IDXGIFactory>();
+            using var dxgiFactory = _device.QueryInterface<IDXGIDevice>().GetParent<IDXGIAdapter>().GetParent<IDXGIFactory>();
             var swapchainDesc = new SwapChainDescription()
             {
                 BufferCount = 1,
-                BufferDescription = new ModeDescription(window.Dimensions.Width, window.Dimensions.Height, format),
+                BufferDescription = new ModeDescription(_window.Dimensions.Width, _window.Dimensions.Height, _format),
                 Windowed = true,
-                OutputWindow = window.Handle,
+                OutputWindow = _window.Handle,
                 SampleDescription = new SampleDescription(1, 0),
                 SwapEffect = SwapEffect.Discard,
                 BufferUsage = Usage.RenderTargetOutput,
             };
 
-            swapChain = dxgiFactory.CreateSwapChain(device, swapchainDesc);
-            dxgiFactory.MakeWindowAssociation(window.Handle, WindowAssociationFlags.IgnoreAll);
+            _swapChain = dxgiFactory.CreateSwapChain(_device, swapchainDesc);
+            dxgiFactory.MakeWindowAssociation(_window.Handle, WindowAssociationFlags.IgnoreAll);
 
-            backBuffer = swapChain.GetBuffer<ID3D11Texture2D>(0);
-            renderView = device.CreateRenderTargetView(backBuffer);
+            _backBuffer = _swapChain.GetBuffer<ID3D11Texture2D>(0);
+            _renderView = _device.CreateRenderTargetView(_backBuffer);
         }
         else
         {
-            renderView.Dispose();
-            backBuffer.Dispose();
+            _renderView.Dispose();
+            _backBuffer.Dispose();
 
-            swapChain.ResizeBuffers(1, window.Dimensions.Width, window.Dimensions.Height, format, SwapChainFlags.None);
+            _swapChain.ResizeBuffers(1, _window.Dimensions.Width, _window.Dimensions.Height, _format, SwapChainFlags.None);
 
-            backBuffer = swapChain.GetBuffer<ID3D11Texture2D1>(0);
-            renderView = device.CreateRenderTargetView(backBuffer);
+            _backBuffer = _swapChain.GetBuffer<ID3D11Texture2D1>(0);
+            _renderView = _device.CreateRenderTargetView(_backBuffer);
         }
 
-        renderer.Resize(window.Dimensions.Width, window.Dimensions.Height);
+        _renderer.Resize(_window.Dimensions.Width, _window.Dimensions.Height);
     }
 
     private bool ProcessMessage(WindowMessage msg, IntPtr wParam, IntPtr lParam)
@@ -470,19 +452,15 @@ public abstract class Overlay : IDisposable
                     case SizeMessage.SIZE_RESTORED:
                     case SizeMessage.SIZE_MAXIMIZED:
                         var lp = (int)lParam;
-                        window.Dimensions.Width = Utils.Loword(lp);
-                        window.Dimensions.Height = Utils.Hiword(lp);
+                        _window.Dimensions.Width = Utils.Loword(lp);
+                        _window.Dimensions.Height = Utils.Hiword(lp);
                         OnResize();
-                        break;
-                    default:
                         break;
                 }
 
                 break;
             case WindowMessage.Destroy:
                 Close();
-                break;
-            default:
                 break;
         }
 
@@ -491,13 +469,11 @@ public abstract class Overlay : IDisposable
 
     private IntPtr WndProc(HWND hWnd, uint msg, IntPtr wParam, IntPtr lParam)
     {
-        if (overlayIsReady)
+        if (_overlayIsReady &&
+            (_inputhandler.ProcessMessage((WindowMessage)msg, wParam, lParam) ||
+             ProcessMessage((WindowMessage)msg, wParam, lParam)))
         {
-            if (inputhandler.ProcessMessage((WindowMessage)msg, wParam, lParam) ||
-                ProcessMessage((WindowMessage)msg, wParam, lParam))
-            {
-                return IntPtr.Zero;
-            }
+            return IntPtr.Zero;
         }
 
         return User32.DefWindowProc(hWnd, msg, wParam, lParam);
