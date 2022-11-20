@@ -15,7 +15,7 @@
     using SixLabors.ImageSharp.PixelFormats;
     using System.Buffers;
 
-    unsafe internal sealed class ImGuiRenderer : IDisposable
+    internal sealed unsafe class ImGuiRenderer : IDisposable
     {
         const int VertexConstantBufferSize = 16 * 4;
 
@@ -50,8 +50,8 @@
             io.ConfigFlags |= ImGuiConfigFlags.NavEnableKeyboard;
             io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;
             ImGui.StyleColorsDark();
-            this.Resize(width, height);
-            this.CreateDeviceObjects();
+            Resize(width, height);
+            CreateDeviceObjects();
         }
 
         public void Start()
@@ -188,7 +188,7 @@
             if (device == null)
                 return;
 
-            this.DeRegisterAllTexture();
+            DeRegisterAllTexture();
             fontSampler?.Release();
             indexBuffer?.Release();
             vertexBuffer?.Release();
@@ -225,15 +225,15 @@
 
         public bool RemoveImageTexture(IntPtr handle)
         {
-            using var tex = this.DeRegisterTexture(handle);
+            using var tex = DeRegisterTexture(handle);
             return tex != null;
         }
 
         public void UpdateFontTexture(string fontPathName, float fontSize, ushort[]? fontCustomGlyphRange, FontGlyphRangeType fontLanguage)
         {
             var io = ImGui.GetIO();
-            this.DeRegisterTexture(io.Fonts.TexID)?.Release();
-            this.fontSampler?.Release();
+            DeRegisterTexture(io.Fonts.TexID)?.Release();
+            fontSampler?.Release();
             io.Fonts.Clear();
             var config = ImGuiNative.ImFontConfig_ImFontConfig();
             if (fontCustomGlyphRange == null)
@@ -276,7 +276,7 @@
                 }
             }
 
-            this.CreateFontsTexture();
+            CreateFontsTexture();
             ImGuiNative.ImFontConfig_destroy(config);
         }
 
@@ -328,7 +328,7 @@
                 0f,
                 0f);
 
-            this.fontSampler = device.CreateSamplerState(samplerDesc);
+            fontSampler = device.CreateSamplerState(samplerDesc);
             io.Fonts.ClearTexData();
         }
 
@@ -355,7 +355,7 @@
         {
             foreach (var key in textureResources.Keys.ToArray())
             {
-                this.DeRegisterTexture(key)?.Release();
+                DeRegisterTexture(key)?.Release();
             }
         }
 
@@ -447,7 +447,7 @@
             var depthDesc = new DepthStencilDescription(false, DepthWriteMask.All, ComparisonFunction.Always);
             depthStencilState = device.CreateDepthStencilState(depthDesc);
 
-            this.CreateFontsTexture();
+            CreateFontsTexture();
         }
 
 #if false

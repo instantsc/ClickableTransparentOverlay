@@ -36,7 +36,7 @@
             {
                 counter++;
                 yield return new Wait(3);
-                this.data = counter;
+                data = counter;
             }
         }
 
@@ -72,8 +72,8 @@
             ImGui.Text($"Total Time/Delta Time: {ImGui.GetTime():F3}/{ImGui.GetIO().DeltaTime:F3}");
             ImGui.NewLine();
 
-            ImGui.Text($"Counter: {this.data}");
-            ImGui.Text($"{this.data2}");
+            ImGui.Text($"Counter: {data}");
+            ImGui.Text($"{data2}");
             ImGui.NewLine();
 
             ImGui.Text($"Event Coroutines: {CoroutineHandler.EventCount}");

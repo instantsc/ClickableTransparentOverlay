@@ -1,6 +1,8 @@
-﻿namespace ClickableTransparentOverlay
+﻿using Vanara.PInvoke;
+
+namespace ClickableTransparentOverlay
 {
-    using ClickableTransparentOverlay.Win32;
+    using Win32;
     using SixLabors.ImageSharp;
     using SixLabors.ImageSharp.PixelFormats;
     using System;
@@ -91,13 +93,13 @@
         /// </param>
         public Overlay(string windowTitle, bool DPIAware)
         {
-            this.VSync = true;
-            this._disposedValue = false;
-            this.overlayIsReady = false;
-            this.title = windowTitle;
-            this.cancellationTokenSource = new();
-            this.format = Format.R8G8B8A8_UNorm;
-            this.loadedTexturesPtrs = new();
+            VSync = true;
+            _disposedValue = false;
+            overlayIsReady = false;
+            title = windowTitle;
+            cancellationTokenSource = new();
+            format = Format.R8G8B8A8_UNorm;
+            loadedTexturesPtrs = new();
             if (DPIAware)
             {
                 User32.SetProcessDPIAware();
@@ -114,38 +116,38 @@
         /// <returns>A Task that finishes once the overlay window is ready</returns>
         public async Task Start()
         {
-            this.renderThread = new Thread(async () =>
+            renderThread = new Thread(async () =>
             {
                 D3D11.D3D11CreateDevice(null, DriverType.Hardware, DeviceCreationFlags.None,
-                    new[] { FeatureLevel.Level_10_0 }, out this.device, out this.deviceContext);
-                this.selfPointer = Kernel32.GetModuleHandle(null);
-                var wndClass = new WNDCLASSEX
+                    new[] { FeatureLevel.Level_10_0 }, out device, out deviceContext);
+                selfPointer = Kernel32.GetModuleHandle().ReleaseOwnership();
+                var wndClass = new User32.WNDCLASSEX
                 {
-                    Size = Unsafe.SizeOf<WNDCLASSEX>(),
-                    Styles = WindowClassStyles.CS_HREDRAW | WindowClassStyles.CS_VREDRAW | WindowClassStyles.CS_PARENTDC,
-                    WindowProc = WndProc,
-                    InstanceHandle = this.selfPointer,
-                    CursorHandle = User32.LoadCursor(IntPtr.Zero, SystemCursor.IDC_ARROW),
-                    BackgroundBrushHandle = IntPtr.Zero,
-                    IconHandle = IntPtr.Zero,
-                    ClassName = "WndClass",
+                    cbSize = (uint)Unsafe.SizeOf<User32.WNDCLASSEX>(),
+                    style =  User32.WindowClassStyles.CS_HREDRAW | User32.WindowClassStyles.CS_VREDRAW | User32.WindowClassStyles.CS_PARENTDC,
+                    lpfnWndProc = WndProc,
+                    hInstance = selfPointer,
+                    hCursor = User32.LoadCursor(IntPtr.Zero, (int)SystemCursor.IDC_ARROW),
+                    hbrBackground = IntPtr.Zero,
+                    hIcon = IntPtr.Zero,
+                    lpszClassName = "WndClass",
                 };
 
-                User32.RegisterClassEx(ref wndClass);
-                this.window = new Win32Window(wndClass.ClassName, 800, 600, 0, 0, this.title,
-                    WindowStyles.WS_POPUP, WindowExStyles.WS_EX_ACCEPTFILES | WindowExStyles.WS_EX_TOPMOST);
-                this.renderer = new ImGuiRenderer(device, deviceContext, 800, 600);
-                this.inputhandler = new ImGuiInputHandler(this.window.Handle);
-                this.overlayIsReady = true;
-                await this.PostInitialized();
-                User32.ShowWindow(this.window.Handle, ShowWindowCommand.ShowMaximized);
-                Utils.InitTransparency(this.window.Handle);
-                this.renderer.Start();
-                this.RunInfiniteLoop(this.cancellationTokenSource.Token);
+                User32.RegisterClassEx(wndClass);
+                window = new Win32Window(wndClass.lpszClassName, 800, 600, 0, 0, title,
+                    User32.WindowStyles.WS_POPUP, User32.WindowStylesEx.WS_EX_ACCEPTFILES | User32.WindowStylesEx.WS_EX_TOPMOST);
+                renderer = new ImGuiRenderer(device, deviceContext, 800, 600);
+                inputhandler = new ImGuiInputHandler(window.Handle);
+                overlayIsReady = true;
+                await PostInitialized();
+                User32.ShowWindow(window.Handle, ShowWindowCommand.SW_MAXIMIZE);
+                Utils.InitTransparency(window.Handle);
+                renderer.Start();
+                RunInfiniteLoop(cancellationTokenSource.Token);
             });
 
-            this.renderThread.Start();
-            await WaitHelpers.SpinWait(() => this.overlayIsReady);
+            renderThread.Start();
+            await WaitHelpers.SpinWait(() => overlayIsReady);
         }
 
         /// <summary>
@@ -154,12 +156,12 @@
         /// <returns>A task that finishes once the overlay window closes</returns>
         public virtual async Task Run()
         {
-            if (!this.overlayIsReady)
+            if (!overlayIsReady)
             {
-                await this.Start();
+                await Start();
             }
 
-            await WaitHelpers.SpinWait(() => this.cancellationTokenSource.IsCancellationRequested);
+            await WaitHelpers.SpinWait(() => cancellationTokenSource.IsCancellationRequested);
         }
 
         /// <summary>
@@ -167,7 +169,7 @@
         /// </summary>
         public virtual void Close()
         {
-            this.cancellationTokenSource.Cancel();
+            cancellationTokenSource.Cancel();
         }
 
         /// <summary>
@@ -175,7 +177,7 @@
         /// </summary>
         public void Dispose()
         {
-            this.Dispose(true);
+            Dispose(true);
             GC.SuppressFinalize(this);
         }
 
@@ -193,11 +195,11 @@
                 return false;
             }
 
-            this.fontPathName = pathName;
-            this.fontSize = size;
-            this.fontLanguage = language;
-            this.replaceFont = true;
-            this.fontCustomGlyphRange = null;
+            fontPathName = pathName;
+            fontSize = size;
+            fontLanguage = language;
+            replaceFont = true;
+            fontCustomGlyphRange = null;
             return true;
         }
 
@@ -234,15 +236,15 @@
         {
             get
             {
-                return this.window.Dimensions.Location;
+                return window.Dimensions.Location;
             }
 
             set
             {
-                if (this.window.Dimensions.Location != value)
+                if (window.Dimensions.Location != value)
                 {
-                    User32.MoveWindow(this.window.Handle, value.X, value.Y, this.window.Dimensions.Width, this.window.Dimensions.Width, true);
-                    this.window.Dimensions.Location = value;
+                    User32.MoveWindow(window.Handle, value.X, value.Y, window.Dimensions.Width, window.Dimensions.Width, true);
+                    window.Dimensions.Location = value;
                 }
             }
         }
@@ -254,14 +256,14 @@
         {
             get
             {
-                return this.window.Dimensions.Size;
+                return window.Dimensions.Size;
             }
             set
             {
-                if (this.window.Dimensions.Size != value)
+                if (window.Dimensions.Size != value)
                 {
-                    User32.MoveWindow(this.window.Handle, this.window.Dimensions.X, this.window.Dimensions.X, value.Width, value.Height, true);
-                    this.window.Dimensions.Size = value;
+                    User32.MoveWindow(window.Handle, window.Dimensions.X, window.Dimensions.X, value.Width, value.Height, true);
+                    window.Dimensions.Size = value;
                 }
             }
         }
@@ -273,7 +275,7 @@
         {
             get
             {
-                return User32.GetSystemMetrics(0x50); // SM_CMONITORS
+                return User32.GetSystemMetrics(User32.SystemMetric.SM_CMONITORS);
             }
         }
 
@@ -290,7 +292,7 @@
         /// <param name="height">height of the loaded texture.</param>
         public void AddOrGetImagePointer(string filePath, bool srgb, out IntPtr handle, out uint width, out uint height)
         {
-            if (this.loadedTexturesPtrs.TryGetValue(filePath, out var data))
+            if (loadedTexturesPtrs.TryGetValue(filePath, out var data))
             {
                 handle = data.Handle;
                 width = data.Width;
@@ -301,10 +303,10 @@
                 var configuration = Configuration.Default.Clone();
                 configuration.PreferContiguousImageBuffers = true;
                 using var image = Image.Load<Rgba32>(configuration, filePath);
-                handle = this.renderer.CreateImageTexture(image, srgb ? Format.R8G8B8A8_UNorm_SRgb : Format.R8G8B8A8_UNorm);
+                handle = renderer.CreateImageTexture(image, srgb ? Format.R8G8B8A8_UNorm_SRgb : Format.R8G8B8A8_UNorm);
                 width = (uint)image.Width;
                 height = (uint)image.Height;
-                this.loadedTexturesPtrs.Add(filePath, new(handle, width, height));
+                loadedTexturesPtrs.Add(filePath, new(handle, width, height));
             }
         }
 
@@ -320,14 +322,14 @@
         /// <param name="handle">output pointer to the image in the graphic device.</param>
         public void AddOrGetImagePointer(string name, Image<Rgba32> image, bool srgb, out IntPtr handle)
         {
-            if (this.loadedTexturesPtrs.TryGetValue(name, out var data))
+            if (loadedTexturesPtrs.TryGetValue(name, out var data))
             {
                 handle = data.Handle;
             }
             else
             {
-                handle = this.renderer.CreateImageTexture(image, srgb ? Format.R8G8B8A8_UNorm_SRgb : Format.R8G8B8A8_UNorm);
-                this.loadedTexturesPtrs.Add(name, new(handle, (uint)image.Width, (uint)image.Height));
+                handle = renderer.CreateImageTexture(image, srgb ? Format.R8G8B8A8_UNorm_SRgb : Format.R8G8B8A8_UNorm);
+                loadedTexturesPtrs.Add(name, new(handle, (uint)image.Width, (uint)image.Height));
             }
         }
 
@@ -338,9 +340,9 @@
         /// <returns> true if the image is removed otherwise false.</returns>
         public bool RemoveImage(string key)
         {
-            if (this.loadedTexturesPtrs.Remove(key, out var data))
+            if (loadedTexturesPtrs.Remove(key, out var data))
             {
-                return this.renderer.RemoveImageTexture(data.Handle);
+                return renderer.RemoveImageTexture(data.Handle);
             }
 
             return false;
@@ -350,36 +352,36 @@
 
         protected virtual void Dispose(bool disposing)
         {
-            if (this._disposedValue)
+            if (_disposedValue)
             {
                 return;
             }
 
             if (disposing)
             {
-                this.renderThread?.Join();
-                foreach(var key in this.loadedTexturesPtrs.Keys.ToArray())
+                renderThread?.Join();
+                foreach(var key in loadedTexturesPtrs.Keys.ToArray())
                 {
-                    this.RemoveImage(key);
+                    RemoveImage(key);
                 }
 
-                this.cancellationTokenSource?.Dispose();
-                this.swapChain?.Release();
-                this.backBuffer?.Release();
-                this.renderView?.Release();
-                this.renderer?.Dispose();
-                this.window?.Dispose();
-                this.deviceContext?.Release();
-                this.device?.Release();
+                cancellationTokenSource?.Dispose();
+                swapChain?.Release();
+                backBuffer?.Release();
+                renderView?.Release();
+                renderer?.Dispose();
+                window?.Dispose();
+                deviceContext?.Release();
+                device?.Release();
             }
 
-            if (this.selfPointer != IntPtr.Zero)
+            if (selfPointer != IntPtr.Zero)
             {
-                _ = User32.UnregisterClass(this.title, this.selfPointer);
-                this.selfPointer = IntPtr.Zero;
+                _ = User32.UnregisterClass(title, selfPointer);
+                selfPointer = IntPtr.Zero;
             }
 
-            this._disposedValue = true;
+            _disposedValue = true;
         }
 
         /// <summary>
@@ -405,31 +407,31 @@
             {
                 deltaTime = stopwatch.ElapsedTicks / (float)Stopwatch.Frequency;
                 stopwatch.Restart();
-                this.window.PumpEvents();
-                Utils.SetOverlayClickable(this.window.Handle, this.inputhandler.Update());
-                this.renderer.Update(deltaTime, () => { Render(); });
-                this.deviceContext.OMSetRenderTargets(renderView);
-                this.deviceContext.ClearRenderTargetView(renderView, clearColor);
-                this.renderer.Render();
+                window.PumpEvents();
+                Utils.SetOverlayClickable(window.Handle, inputhandler.Update());
+                renderer.Update(deltaTime, () => { Render(); });
+                deviceContext.OMSetRenderTargets(renderView);
+                deviceContext.ClearRenderTargetView(renderView, clearColor);
+                renderer.Render();
                 if (VSync)
                 {
-                    this.swapChain.Present(1, PresentFlags.None); // Present with vsync
+                    swapChain.Present(1, PresentFlags.None); // Present with vsync
                 }
                 else
                 {
-                    this.swapChain.Present(0, PresentFlags.None); // Present without vsync
+                    swapChain.Present(0, PresentFlags.None); // Present without vsync
                 }
 
-                this.ReplaceFontIfRequired();
+                ReplaceFontIfRequired();
             }
         }
 
         private void ReplaceFontIfRequired()
         {
-            if (this.replaceFont && this.renderer != null)
+            if (replaceFont && renderer != null)
             {
-                this.renderer.UpdateFontTexture(this.fontPathName, this.fontSize, this.fontCustomGlyphRange, this.fontLanguage);
-                this.replaceFont = false;
+                renderer.UpdateFontTexture(fontPathName, fontSize, fontCustomGlyphRange, fontLanguage);
+                replaceFont = false;
             }
         }
 
@@ -441,35 +443,35 @@
                 var swapchainDesc = new SwapChainDescription()
                 {
                     BufferCount = 1,
-                    BufferDescription = new ModeDescription(this.window.Dimensions.Width, this.window.Dimensions.Height, this.format),
+                    BufferDescription = new ModeDescription(window.Dimensions.Width, window.Dimensions.Height, format),
                     Windowed = true,
-                    OutputWindow = this.window.Handle,
+                    OutputWindow = window.Handle,
                     SampleDescription = new SampleDescription(1, 0),
                     SwapEffect = SwapEffect.Discard,
                     BufferUsage = Usage.RenderTargetOutput,
                 };
 
-                this.swapChain = dxgiFactory.CreateSwapChain(this.device, swapchainDesc);
-                dxgiFactory.MakeWindowAssociation(this.window.Handle, WindowAssociationFlags.IgnoreAll);
+                swapChain = dxgiFactory.CreateSwapChain(device, swapchainDesc);
+                dxgiFactory.MakeWindowAssociation(window.Handle, WindowAssociationFlags.IgnoreAll);
 
-                this.backBuffer = this.swapChain.GetBuffer<ID3D11Texture2D>(0);
-                this.renderView = this.device.CreateRenderTargetView(backBuffer);
+                backBuffer = swapChain.GetBuffer<ID3D11Texture2D>(0);
+                renderView = device.CreateRenderTargetView(backBuffer);
             }
             else
             {
-                this.renderView.Dispose();
-                this.backBuffer.Dispose();
+                renderView.Dispose();
+                backBuffer.Dispose();
 
-                this.swapChain.ResizeBuffers(1, this.window.Dimensions.Width, this.window.Dimensions.Height, this.format, SwapChainFlags.None);
+                swapChain.ResizeBuffers(1, window.Dimensions.Width, window.Dimensions.Height, format, SwapChainFlags.None);
 
-                backBuffer = this.swapChain.GetBuffer<ID3D11Texture2D1>(0);
-                renderView = this.device.CreateRenderTargetView(backBuffer);
+                backBuffer = swapChain.GetBuffer<ID3D11Texture2D1>(0);
+                renderView = device.CreateRenderTargetView(backBuffer);
             }
 
-            this.renderer.Resize(this.window.Dimensions.Width, this.window.Dimensions.Height);
+            renderer.Resize(window.Dimensions.Width, window.Dimensions.Height);
         }
 
-        private bool ProcessMessage(WindowMessage msg, UIntPtr wParam, IntPtr lParam)
+        private bool ProcessMessage(WindowMessage msg, IntPtr wParam, IntPtr lParam)
         {
             switch (msg)
             {
@@ -479,9 +481,9 @@
                         case SizeMessage.SIZE_RESTORED:
                         case SizeMessage.SIZE_MAXIMIZED:
                             var lp = (int)lParam;
-                            this.window.Dimensions.Width = Utils.Loword(lp);
-                            this.window.Dimensions.Height = Utils.Hiword(lp);
-                            this.OnResize();
+                            window.Dimensions.Width = Utils.Loword(lp);
+                            window.Dimensions.Height = Utils.Hiword(lp);
+                            OnResize();
                             break;
                         default:
                             break;
@@ -489,7 +491,7 @@
 
                     break;
                 case WindowMessage.Destroy:
-                    this.Close();
+                    Close();
                     break;
                 default:
                     break;
@@ -498,12 +500,12 @@
             return false;
         }
 
-        private IntPtr WndProc(IntPtr hWnd, uint msg, UIntPtr wParam, IntPtr lParam)
+        private IntPtr WndProc(HWND hWnd, uint msg, IntPtr wParam, IntPtr lParam)
         {
-            if (this.overlayIsReady)
+            if (overlayIsReady)
             {
-                if (this.inputhandler.ProcessMessage((WindowMessage)msg, wParam, lParam) ||
-                    this.ProcessMessage((WindowMessage)msg, wParam, lParam))
+                if (inputhandler.ProcessMessage((WindowMessage)msg, wParam, lParam) ||
+                    ProcessMessage((WindowMessage)msg, wParam, lParam))
                 {
                     return IntPtr.Zero;
                 }

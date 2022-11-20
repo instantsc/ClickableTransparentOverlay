@@ -1,4 +1,7 @@
-﻿namespace ClickableTransparentOverlay.Win32
+﻿using Vanara.Extensions;
+using Vanara.PInvoke;
+
+namespace ClickableTransparentOverlay.Win32
 {
     using System;
     using System.Diagnostics;
@@ -13,8 +16,8 @@
         /// </summary>
         internal static bool IsClickable { get; private set; } = true;
 
-        private static WindowExStyles Clickable = 0;
-        private static WindowExStyles NotClickable = 0;
+        private static User32.WindowStylesEx Clickable = 0;
+        private static User32.WindowStylesEx NotClickable = 0;
 
         private static readonly Stopwatch sw = Stopwatch.StartNew();
         private static readonly long[] nVirtKeyTimeouts = new long[256]; // Total VirtKeys are 256.
@@ -32,7 +35,7 @@
         /// <returns>weather the key is pressed or not.</returns>
         public static bool IsKeyPressed(VK nVirtKey)
         {
-            return Convert.ToBoolean(User32.GetKeyState(nVirtKey) & 0x8000);
+            return (User32.GetKeyState((int)nVirtKey) & 0x8000) != 0;
         }
 
         /// <summary>
@@ -68,10 +71,10 @@
         /// </param>
         internal static void InitTransparency(IntPtr handle)
         {
-            Clickable = (WindowExStyles)User32.GetWindowLong(handle, (int)WindowLongParam.GWL_EXSTYLE);
-            NotClickable = Clickable | WindowExStyles.WS_EX_LAYERED | WindowExStyles.WS_EX_TRANSPARENT;
-            var margins = new Dwmapi.Margins(-1);
-            _ = Dwmapi.DwmExtendFrameIntoClientArea(handle, ref margins);
+            Clickable = (User32.WindowStylesEx)User32.GetWindowLongPtr(handle, User32.WindowLongFlags.GWL_EXSTYLE);
+            NotClickable = Clickable | User32.WindowStylesEx.WS_EX_LAYERED | User32.WindowStylesEx.WS_EX_TRANSPARENT;
+            var margins = new DwmApi.MARGINS(-1);
+            DwmApi.DwmExtendFrameIntoClientArea(handle, in margins);
             SetOverlayClickable(handle, true);
         }
 
@@ -87,12 +90,12 @@
             {
                 if (WantClickable)
                 {
-                    User32.SetWindowLong(handle, (int)WindowLongParam.GWL_EXSTYLE, (uint)Clickable);
+                    User32.SetWindowLong(handle, User32.WindowLongFlags.GWL_EXSTYLE, (int) Clickable);
                     User32.SetFocus(handle);
                 }
                 else
                 {
-                    User32.SetWindowLong(handle, (int)WindowLongParam.GWL_EXSTYLE, (uint)NotClickable);
+                    User32.SetWindowLong(handle, User32.WindowLongFlags.GWL_EXSTYLE, (int)NotClickable);
                 }
 
                 IsClickable = WantClickable;

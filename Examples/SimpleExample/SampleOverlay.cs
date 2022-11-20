@@ -16,9 +16,9 @@
         protected override void Render()
         {
             ImGui.ShowDemoWindow(ref wantKeepDemoWindow);
-            if (!this.wantKeepDemoWindow)
+            if (!wantKeepDemoWindow)
             {
-                this.Close();
+                Close();
             }
         }
     }

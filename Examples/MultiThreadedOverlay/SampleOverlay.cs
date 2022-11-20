@@ -41,7 +41,7 @@
         public override void Close()
         {
             base.Close();
-            this.state.IsRunning = false;
+            state.IsRunning = false;
         }
 
         private void LogicUpdate(float updateDeltaTicks)
@@ -211,7 +211,7 @@
             ImGui.Text("I am sample Overlay to display stuff.");
             ImGui.Text("You can not click me.");
             ImGui.NewLine();
-            ImGui.Text($"Number of displays {Overlay.NumberVideoDisplays}");
+            ImGui.Text($"Number of displays {NumberVideoDisplays}");
             ImGui.Text($"Current Date: {DateTime.Now.Date.ToShortDateString()}");
             ImGui.Text($"Current Time: {DateTime.Now.TimeOfDay}");
             ImGui.Text($"Total Rendered Frames: {state.RenderFramesCounter.Count}");
