@@ -4,6 +4,7 @@ using System.Drawing;
 using System.IO;
 using System.Numerics;
 using System.Threading;
+using System.Threading.Tasks;
 using ClickableTransparentOverlay;
 using ClickableTransparentOverlay.Win32;
 using ImGuiNET;
@@ -37,9 +38,8 @@ public class SampleOverlay : Overlay
         _logicThread.Start();
     }
 
-    public override void Close()
+    protected override async Task OnClosed()
     {
-        base.Close();
         _state.IsRunning = false;
     }
 

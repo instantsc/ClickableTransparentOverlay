@@ -75,9 +75,9 @@ internal class ImGuiInputHandler
             case WindowMessage.KeyUp:
             case WindowMessage.SysKeyUp:
                 var isKeyDown = msg == WindowMessage.SysKeyDown || msg == WindowMessage.KeyDown;
-                if ((ulong)wParam < 256 && TryMapKey((VK)wParam, out var imguikey))
+                if ((ulong)wParam < 256 && TryMapKey((VK)wParam, out var imguiKey))
                 {
-                    io.AddKeyEvent(imguikey, isKeyDown);
+                    io.AddKeyEvent(imguiKey, isKeyDown);
                 }
 
                 break;

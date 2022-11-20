@@ -228,7 +228,7 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
         return tex != null;
     }
 
-    public void UpdateFontTexture(string fontPathName, float fontSize, ushort[]? fontCustomGlyphRange, FontGlyphRangeType fontLanguage)
+    public void UpdateFontTexture(string fontPathName, float fontSize, ushort[]? fontCustomGlyphRange, FontGlyphRangeType? fontLanguage)
     {
         var io = ImGui.GetIO();
         DeRegisterTexture(io.Fonts.TexID)?.Release();
