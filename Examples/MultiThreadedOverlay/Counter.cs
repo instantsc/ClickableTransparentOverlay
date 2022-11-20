@@ -1,12 +1,11 @@
-﻿namespace MultiThreadedOverlay
-{
-    public class Counter
-    {
-        public long Count { get; private set; }
+namespace MultiThreadedOverlay;
 
-        public void Increment()
-        {
-            Count++;
-        }
+public class Counter
+{
+    public long Count { get; private set; }
+
+    public void Increment()
+    {
+        Count++;
     }
 }
