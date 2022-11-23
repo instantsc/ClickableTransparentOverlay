@@ -26,6 +26,7 @@ namespace ClickableTransparentOverlay;
 /// </summary>
 public abstract class Overlay : IDisposable
 {
+    private static readonly Color4 ClearColor = new Color4(0.0f);
     private const Format Format = Vortice.DXGI.Format.R8G8B8A8_UNorm;
 
     private Win32Window _window;
@@ -103,9 +104,9 @@ public abstract class Overlay : IDisposable
     /// <returns>A Task that finishes once the overlay window is ready</returns>
     public async Task Start()
     {
-        if (Interlocked.CompareExchange(ref _overlayWasStarted, 1, 0) != 0)
+        if (!TrySetFirstStart())
         {
-            return;
+            throw new Exception("Overlay is already started");
         }
 
         _renderThread = new Thread(() =>
@@ -132,9 +133,10 @@ public abstract class Overlay : IDisposable
                     User32.WindowStyles.WS_POPUP, User32.WindowStylesEx.WS_EX_ACCEPTFILES | User32.WindowStylesEx.WS_EX_TOPMOST);
                 _renderer = new ImGuiRenderer(_device, _deviceContext, 800, 600);
                 _inputHandler = new ImGuiInputHandler(_window.Handle);
-                Task.Run(PostInitialized).Wait();
                 User32.ShowWindow(_window.Handle, ShowWindowCommand.SW_MAXIMIZE);
                 Utils.InitTransparency(_window.Handle);
+                Task.Run(PostInitialized).Wait();
+                _overlayReadyTcs.SetResult();
             }
             catch (Exception ex)
             {
@@ -142,15 +144,14 @@ public abstract class Overlay : IDisposable
                 return;
             }
 
-            _overlayReadyTcs.SetResult();
-            while (_messageQueue.TryDequeue(out var message))
-            {
-                ProcessMessage(message.msg, message.wParam, message.lParam);
-            }
-
             try
             {
-                RunInfiniteLoop(_cancellationTokenSource.Token);
+                while (_messageQueue.TryDequeue(out var message))
+                {
+                    ProcessMessage(message.msg, message.wParam, message.lParam);
+                }
+
+                RunFrameLoop(_cancellationTokenSource.Token);
                 Task.Run(OnClosed).Wait();
                 _overlayClosedTcs.SetResult();
             }
@@ -163,6 +164,12 @@ public abstract class Overlay : IDisposable
         _renderThread.Start();
         await _overlayReadyTcs.Task;
     }
+
+    private bool TrySetFirstStart()
+    {
+        return Interlocked.CompareExchange(ref _overlayWasStarted, 1, 0) == 0;
+    }
+
 
     /// <summary>
     /// Starts the overlay and waits for the overlay window to be closed.
@@ -267,6 +274,8 @@ public abstract class Overlay : IDisposable
             }
         }
     }
+
+    public IntPtr? WindowHandle => _window?.Handle;
 
     /// <summary>
     /// Gets the number of displays available on the computer.
@@ -395,25 +404,35 @@ public abstract class Overlay : IDisposable
     /// <returns>Task that finishes once per frame</returns>
     protected abstract void Render();
 
-    private void RunInfiniteLoop(CancellationToken token)
+    private void RunFrameLoop(CancellationToken token)
     {
         var stopwatch = Stopwatch.StartNew();
-        var clearColor = new Color4(0.0f);
         _renderer.Start();
         while (!token.IsCancellationRequested)
         {
             var deltaTime = (float)stopwatch.Elapsed.TotalSeconds;
             stopwatch.Restart();
             _window.PumpEvents();
-            Utils.SetOverlayClickable(_window.Handle, _inputHandler.Update());
+            if (Utils.SetOverlayClickable(_window.Handle, _inputHandler.Update()) == false)
+            {
+                FocusLost?.Invoke(this, EventArgs.Empty);
+            }
+
             _renderer.Update(deltaTime, Render);
             _deviceContext.OMSetRenderTargets(_renderView);
-            _deviceContext.ClearRenderTargetView(_renderView, clearColor);
+            _deviceContext.ClearRenderTargetView(_renderView, ClearColor);
             _renderer.Render();
             _swapChain.Present(VSync ? 1 : 0, PresentFlags.None);
             ReplaceFontIfRequired();
+            PostFrame();
         }
     }
+
+    protected virtual void PostFrame()
+    {
+    }
+
+    public event EventHandler FocusLost;
 
     private void ReplaceFontIfRequired()
     {

@@ -82,7 +82,7 @@ public static class Utils
     /// </summary>
     /// <param name="handle">Veldrid window handle in IntPtr format.</param>
     /// <param name="wantClickable">Set to true if you want to make the window clickable otherwise false.</param>
-    internal static void SetOverlayClickable(IntPtr handle, bool wantClickable)
+    internal static bool? SetOverlayClickable(IntPtr handle, bool wantClickable)
     {
         if (IsClickable ^ wantClickable)
         {
@@ -96,7 +96,9 @@ public static class Utils
                 User32.SetWindowLong(handle, User32.WindowLongFlags.GWL_EXSTYLE, (int)_notClickable);
             }
 
-            IsClickable = wantClickable;
+            return IsClickable = wantClickable;
         }
+
+        return null;
     }
 }
