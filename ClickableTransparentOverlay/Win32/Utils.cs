@@ -73,7 +73,7 @@ public static class Utils
         _notClickable = _clickable | User32.WindowStylesEx.WS_EX_LAYERED | User32.WindowStylesEx.WS_EX_TRANSPARENT;
         var margins = new DwmApi.MARGINS(-1);
         DwmApi.DwmExtendFrameIntoClientArea(handle, in margins);
-        SetOverlayClickable(handle, true);
+        SetOverlayClickable(handle, false);
     }
 
     /// <summary>
