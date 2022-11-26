@@ -300,6 +300,21 @@ public abstract class Overlay : IDisposable
         return false;
     }
 
+    public bool HasImagePointer(string nameOrFilePath)
+    {
+        return _loadedTexturePtrs.TryGetValue(nameOrFilePath, out _);
+    }
+
+    public IntPtr GetImagePointer(string nameOrFilePath)
+    {
+        if (_loadedTexturePtrs.TryGetValue(nameOrFilePath, out var data))
+        {
+            return data.Handle;
+        }
+
+        throw new FileNotFoundException($"Texture by name: {nameOrFilePath} not found");
+    }
+
     /// <summary>
     /// Adds the image to the Graphic Device as a texture.
     /// Then returns the pointer of the added texture. It also
