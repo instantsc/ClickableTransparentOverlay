@@ -1,37 +1,38 @@
 using System;
 using System.Drawing;
-using Vanara.PInvoke;
+using Windows.Win32;
+using Windows.Win32.Foundation;
+using Windows.Win32.UI.WindowsAndMessaging;
+using Microsoft.Win32.SafeHandles;
 
 namespace ClickableTransparentOverlay;
 
 internal sealed class Win32Window : IDisposable
 {
-    public IntPtr Handle;
+    public HWND Handle;
     public Rectangle Dimensions;
 
-    public Win32Window(string wndClass, int width, int height, int x, int y, string title, User32.WindowStyles style, User32.WindowStylesEx exStyle)
+    public unsafe Win32Window(string wndClass, int width, int height, int x, int y, string title, WINDOW_STYLE style, WINDOW_EX_STYLE exStyle)
     {
         Dimensions = new Rectangle(x, y, width, height);
-        Handle = User32.CreateWindowEx(exStyle, wndClass, title, style,
-            Dimensions.X, Dimensions.Y, Dimensions.Width, Dimensions.Height).ReleaseOwnership();
+        Handle = PInvoke.CreateWindowEx(exStyle, wndClass, title, style,
+            Dimensions.X, Dimensions.Y, Dimensions.Width, Dimensions.Height, HWND.Null, new SafeFileHandle(IntPtr.Zero, false), new SafeFileHandle(IntPtr.Zero, false), default);
     }
 
     public void PumpEvents()
     {
-        if (User32.PeekMessage(out var msg, IntPtr.Zero, 0, 0, User32.PM.PM_REMOVE))
+        if (PInvoke.PeekMessage(out var msg, HWND.Null, 0, 0, PEEK_MESSAGE_REMOVE_TYPE.PM_REMOVE))
         {
-            User32.TranslateMessage(in msg);
-            User32.DispatchMessage(in msg);
+            PInvoke.TranslateMessage(in msg);
+            PInvoke.DispatchMessage(in msg);
         }
     }
 
     public void Dispose()
     {
-        if (Handle != IntPtr.Zero && User32.DestroyWindow(Handle))
+        if (Handle != IntPtr.Zero && PInvoke.DestroyWindow(Handle))
         {
-            Handle = IntPtr.Zero;
+            Handle = HWND.Null;
         }
-
-        GC.SuppressFinalize(this);
     }
 }

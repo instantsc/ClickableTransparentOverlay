@@ -1,6 +1,8 @@
-using Vanara.PInvoke;
-using System;
 using System.Diagnostics;
+using Windows.Win32;
+using Windows.Win32.Foundation;
+using Windows.Win32.UI.Controls;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace ClickableTransparentOverlay.Win32;
 
@@ -14,8 +16,8 @@ public static class Utils
     /// </summary>
     internal static bool IsClickable { get; private set; } = true;
 
-    private static User32.WindowStylesEx _clickable = 0;
-    private static User32.WindowStylesEx _notClickable = 0;
+    private static WINDOW_EX_STYLE _clickable = 0;
+    private static WINDOW_EX_STYLE _notClickable = 0;
 
     private static readonly Stopwatch sw = Stopwatch.StartNew();
     private static readonly long[] NVirtKeyTimeouts = new long[256]; // Total VirtKeys are 256.
@@ -33,7 +35,7 @@ public static class Utils
     /// <returns>weather the key is pressed or not.</returns>
     public static bool IsKeyPressed(VK nVirtKey)
     {
-        return (User32.GetKeyState((int)nVirtKey) & 0x8000) != 0;
+        return (PInvoke.GetKeyState((int)nVirtKey) & 0x8000) != 0;
     }
 
     /// <summary>
@@ -67,12 +69,11 @@ public static class Utils
     /// <param name="handle">
     /// Window native pointer.
     /// </param>
-    internal static void InitTransparency(IntPtr handle)
+    internal static void InitTransparency(HWND handle)
     {
-        _clickable = (User32.WindowStylesEx)User32.GetWindowLongPtr(handle, User32.WindowLongFlags.GWL_EXSTYLE);
-        _notClickable = _clickable | User32.WindowStylesEx.WS_EX_LAYERED | User32.WindowStylesEx.WS_EX_TRANSPARENT;
-        var margins = new DwmApi.MARGINS(-1);
-        DwmApi.DwmExtendFrameIntoClientArea(handle, in margins);
+        _clickable = (WINDOW_EX_STYLE)PInvoke.GetWindowLongPtr(handle, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE);
+        _notClickable = _clickable | WINDOW_EX_STYLE.WS_EX_LAYERED | WINDOW_EX_STYLE.WS_EX_TRANSPARENT;
+        PInvoke.DwmExtendFrameIntoClientArea(handle, new MARGINS { cxLeftWidth = -1, cxRightWidth = -1, cyBottomHeight = -1, cyTopHeight = -1 });
         SetOverlayClickable(handle, false);
     }
 
@@ -82,18 +83,18 @@ public static class Utils
     /// </summary>
     /// <param name="handle">Veldrid window handle in IntPtr format.</param>
     /// <param name="wantClickable">Set to true if you want to make the window clickable otherwise false.</param>
-    internal static bool? SetOverlayClickable(IntPtr handle, bool wantClickable)
+    internal static bool? SetOverlayClickable(HWND handle, bool wantClickable)
     {
         if (IsClickable ^ wantClickable)
         {
             if (wantClickable)
             {
-                User32.SetWindowLong(handle, User32.WindowLongFlags.GWL_EXSTYLE, (int)_clickable);
-                User32.SetFocus(handle);
+                PInvoke.SetWindowLong(handle, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE, (int)_clickable);
+                PInvoke.SetFocus(handle);
             }
             else
             {
-                User32.SetWindowLong(handle, User32.WindowLongFlags.GWL_EXSTYLE, (int)_notClickable);
+                PInvoke.SetWindowLong(handle, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE, (int)_notClickable);
             }
 
             return IsClickable = wantClickable;

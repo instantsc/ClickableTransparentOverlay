@@ -1,16 +1,18 @@
 using ImGuiNET;
 using System;
+using Windows.Win32;
+using Windows.Win32.Foundation;
+using Windows.Win32.UI.WindowsAndMessaging;
 using ClickableTransparentOverlay.Win32;
-using Vanara.PInvoke;
 
 namespace ClickableTransparentOverlay;
 
 internal class ImGuiInputHandler
 {
-    private readonly IntPtr _hwnd;
+    private readonly HWND _hwnd;
     private ImGuiMouseCursor _lastCursor;
 
-    public ImGuiInputHandler(IntPtr hwnd)
+    public ImGuiInputHandler(HWND hwnd)
     {
         _hwnd = hwnd;
     }
@@ -34,7 +36,7 @@ internal class ImGuiInputHandler
         return io.WantCaptureMouse;
     }
 
-    public bool ProcessMessage(WindowMessage msg, IntPtr wParam, IntPtr lParam)
+    public bool ProcessMessage(WindowMessage msg, WPARAM wParam, LPARAM lParam)
     {
         if (ImGui.GetCurrentContext() == IntPtr.Zero)
             return false;
@@ -75,17 +77,17 @@ internal class ImGuiInputHandler
             case WindowMessage.KeyUp:
             case WindowMessage.SysKeyUp:
                 var isKeyDown = msg == WindowMessage.SysKeyDown || msg == WindowMessage.KeyDown;
-                if ((ulong)wParam < 256 && TryMapKey((VK)wParam, out var imguiKey))
+                if (wParam.Value < 256 && TryMapKey((VK)wParam.Value, out var imguiKey))
                 {
                     io.AddKeyEvent(imguiKey, isKeyDown);
                 }
 
                 break;
             case WindowMessage.Char:
-                io.AddInputCharacterUTF16((ushort)wParam);
+                io.AddInputCharacterUTF16((ushort)wParam.Value);
                 break;
             case WindowMessage.SetCursor:
-                if (Utils.Loword((int)(long)lParam) == 1)
+                if (Utils.Loword((int)lParam.Value) == 1)
                 {
                     var mouseCursor = io.MouseDrawCursor ? ImGuiMouseCursor.None : ImGui.GetMouseCursor();
                     _lastCursor = mouseCursor;
@@ -101,9 +103,9 @@ internal class ImGuiInputHandler
         return false;
     }
 
-    private static void UpdateMousePosition(ImGuiIOPtr io, IntPtr handleWindow)
+    private static void UpdateMousePosition(ImGuiIOPtr io, HWND handleWindow)
     {
-        if (User32.GetCursorPos(out var pos) && User32.ScreenToClient(handleWindow, ref pos))
+        if (PInvoke.GetCursorPos(out var pos) && PInvoke.ScreenToClient(handleWindow, ref pos))
         {
             io.AddMousePosEvent(pos.X, pos.Y);
         }
@@ -117,14 +119,14 @@ internal class ImGuiInputHandler
         io.AddKeyEvent(ImGuiKey.ModSuper, Utils.IsKeyPressed(VK.LWIN));
     }
 
-    private static bool UpdateMouseCursor(ImGuiIOPtr io, ImGuiMouseCursor requestedcursor)
+    private static unsafe bool UpdateMouseCursor(ImGuiIOPtr io, ImGuiMouseCursor requestedcursor)
     {
         if ((io.ConfigFlags & ImGuiConfigFlags.NoMouseCursorChange) != 0)
             return false;
 
         if (requestedcursor == ImGuiMouseCursor.None)
         {
-            User32.SetCursor(new User32.SafeHCURSOR(IntPtr.Zero));
+            PInvoke.SetCursor(HCURSOR.Null);
         }
         else
         {
@@ -142,7 +144,7 @@ internal class ImGuiInputHandler
                 _ => SystemCursor.IDC_ARROW
             };
 
-            User32.SetCursor(User32.LoadCursor(IntPtr.Zero, new IntPtr((int)cursor)));
+            PInvoke.SetCursor(PInvoke.LoadCursor(HINSTANCE.Null, (char*)(int)cursor));
         }
 
         return true;
@@ -215,7 +217,7 @@ internal class ImGuiInputHandler
 
     private static readonly float WheelDelta = 120;
 
-    private static int GET_WHEEL_DELTA_WPARAM(IntPtr wParam) => Utils.Hiword((int)(uint)(ulong)wParam);
+    private static int GET_WHEEL_DELTA_WPARAM(WPARAM wParam) => Utils.Hiword((int)(uint)wParam.Value);
 
-    private static int GET_XBUTTON_WPARAM(IntPtr wParam) => Utils.Hiword((int)(uint)(ulong)wParam);
+    private static int GET_XBUTTON_WPARAM(WPARAM wParam) => Utils.Hiword((int)(uint)wParam.Value);
 }
