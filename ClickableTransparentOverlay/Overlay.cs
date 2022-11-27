@@ -40,6 +40,7 @@ public abstract class Overlay : IDisposable
     private ImGuiRenderer _renderer;
     private ImGuiInputHandler _inputHandler;
     private IntPtr _selfPointer;
+    private IntPtr _iconPtr;
 
     private bool _disposed;
     private Thread _renderThread;
@@ -100,6 +101,26 @@ public abstract class Overlay : IDisposable
         }
     }
 
+    public void SetIcon(string fileName)
+    {
+        var newIcon = User32.LoadImage(IntPtr.Zero, fileName, User32.LoadImageType.IMAGE_ICON, 0, 0, User32.LoadImageOptions.LR_LOADFROMFILE);
+        if (WindowHandle is { } windowHandle)
+        {
+            _overlayReadyTcs.Task.ContinueWith(_ =>
+            {
+                // ReSharper disable RedundantArgumentDefaultValue
+                User32.SendMessage(windowHandle, User32.WindowMessage.WM_SETICON, 1, newIcon);
+                User32.SendMessage(windowHandle, User32.WindowMessage.WM_SETICON, 0, newIcon);
+                // ReSharper restore RedundantArgumentDefaultValue
+            }, TaskContinuationOptions.OnlyOnRanToCompletion);
+        }
+
+        if (Interlocked.Exchange(ref _iconPtr, newIcon) is var oldIcon && oldIcon != IntPtr.Zero)
+        {
+            User32.DestroyIcon(oldIcon);
+        }
+    }
+
     /// <summary>
     /// Starts the overlay
     /// </summary>
@@ -126,7 +147,8 @@ public abstract class Overlay : IDisposable
                     hInstance = _selfPointer,
                     hCursor = User32.LoadCursor(IntPtr.Zero, (int)SystemCursor.IDC_ARROW),
                     hbrBackground = IntPtr.Zero,
-                    hIcon = IntPtr.Zero,
+                    hIcon = _iconPtr,
+                    hIconSm = _iconPtr,
                     lpszClassName = "WndClass",
                 };
 
