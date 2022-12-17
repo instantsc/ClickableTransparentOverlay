@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System;
 using System.Linq;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Advanced;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace ClickableTransparentOverlay;
@@ -210,16 +211,31 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
     public IntPtr CreateImageTexture(Image<Rgba32> image, Format format)
     {
         var texDesc = new Texture2DDescription(format, image.Width, image.Height, 1, 1);
-        if (!image.DangerousTryGetSinglePixelMemory(out var memory))
+        Image<Rgba32>? imageCopy = null;
+        try
         {
-            throw new Exception("Make sure to initialize MemoryAllocator.Default!");
-        }
+            if (!image.DangerousTryGetSinglePixelMemory(out var memory))
+            {
+                var configuration = image.GetConfiguration().Clone();
+                configuration.PreferContiguousImageBuffers = true;
+                imageCopy = image.Clone(configuration);
+                if (!imageCopy.DangerousTryGetSinglePixelMemory(out memory))
+                {
+                    throw new Exception("Unable to get a contiguous memory for the provided image or clone it. " +
+                                        "Make sure you set PreferContiguousImageBuffers for the image configuration");
+                }
+            }
 
-        using var imageMemoryHandle = memory.Pin();
-        var subResource = new SubresourceData(imageMemoryHandle.Pointer, texDesc.Width * 4);
-        using var texture = _device.CreateTexture2D(texDesc, new[] { subResource });
-        var resViewDesc = new ShaderResourceViewDescription(texture, ShaderResourceViewDimension.Texture2D, format, 0, texDesc.MipLevels);
-        return RegisterTexture(_device.CreateShaderResourceView(texture, resViewDesc));
+            using var imageMemoryHandle = memory.Pin();
+            var subResource = new SubresourceData(imageMemoryHandle.Pointer, texDesc.Width * 4);
+            using var texture = _device.CreateTexture2D(texDesc, new[] { subResource });
+            var resViewDesc = new ShaderResourceViewDescription(texture, ShaderResourceViewDimension.Texture2D, format, 0, texDesc.MipLevels);
+            return RegisterTexture(_device.CreateShaderResourceView(texture, resViewDesc));
+        }
+        finally
+        {
+            imageCopy?.Dispose();
+        }
     }
 
     public bool RemoveImageTexture(IntPtr handle)
