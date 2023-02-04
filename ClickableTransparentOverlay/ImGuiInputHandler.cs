@@ -18,7 +18,6 @@ internal class ImGuiInputHandler
     public bool Update()
     {
         var io = ImGui.GetIO();
-        UpdateKeyModifiers(io);
         UpdateMousePosition(io, _hwnd);
         var mouseCursor = io.MouseDrawCursor ? ImGuiMouseCursor.None : ImGui.GetMouseCursor();
         if (mouseCursor != _lastCursor)
@@ -29,6 +28,15 @@ internal class ImGuiInputHandler
             // while mouse isn't moved otherwise redundant.
             // so practically it's redundant.
             UpdateMouseCursor(io, mouseCursor);
+        }
+
+        if (!io.WantCaptureMouse && ImGui.IsAnyMouseDown())
+        {
+            // workaround: where overlay gets stuck in a non-clickable mode forever.
+            for (var i = 0; i < 5; i++)
+            {
+                io.AddMouseButtonEvent(i, false);
+            }
         }
 
         return io.WantCaptureMouse;
@@ -107,14 +115,6 @@ internal class ImGuiInputHandler
         {
             io.AddMousePosEvent(pos.X, pos.Y);
         }
-    }
-
-    private static void UpdateKeyModifiers(ImGuiIOPtr io)
-    {
-        io.AddKeyEvent(ImGuiKey.ModCtrl, Utils.IsKeyPressed(VK.CONTROL));
-        io.AddKeyEvent(ImGuiKey.ModShift, Utils.IsKeyPressed(VK.SHIFT));
-        io.AddKeyEvent(ImGuiKey.ModAlt, Utils.IsKeyPressed(VK.MENU));
-        io.AddKeyEvent(ImGuiKey.ModSuper, Utils.IsKeyPressed(VK.LWIN));
     }
 
     private static bool UpdateMouseCursor(ImGuiIOPtr io, ImGuiMouseCursor requestedcursor)
@@ -198,6 +198,9 @@ internal class ImGuiInputHandler
             VK.MULTIPLY => ImGuiKey.KeypadMultiply,
             VK.SUBTRACT => ImGuiKey.KeypadSubtract,
             VK.ADD => ImGuiKey.KeypadAdd,
+            VK.SHIFT => ImGuiKey.ModShift,
+            VK.CONTROL => ImGuiKey.ModCtrl,
+            VK.MENU => ImGuiKey.ModAlt,
             VK.LSHIFT => ImGuiKey.LeftShift,
             VK.LCONTROL => ImGuiKey.LeftCtrl,
             VK.LMENU => ImGuiKey.LeftAlt,

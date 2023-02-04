@@ -248,8 +248,7 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
     public void UpdateFontTexture(Overlay.FontLoadDelegate fontLoadFunc)
     {
         var io = ImGui.GetIO();
-        DeRegisterTexture(io.Fonts.TexID)?.Release();
-        _fontSampler?.Release();
+        DeRegisterTexture(io.Fonts.TexID)?.Dispose();
         io.Fonts.Clear();
         var config = ImGuiNative.ImFontConfig_ImFontConfig();
         fontLoadFunc(config);
@@ -330,6 +329,11 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
             0,
             texDesc.MipLevels);
         io.Fonts.SetTexID(RegisterTexture(_device.CreateShaderResourceView(texture, resViewDesc)));
+        io.Fonts.ClearTexData();
+    }
+
+    void CreateFontSampler()
+    {
         var samplerDesc = new SamplerDescription(
             Filter.MinMagMipLinear,
             TextureAddressMode.Wrap,
@@ -342,7 +346,6 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
             0f);
 
         _fontSampler = _device.CreateSamplerState(samplerDesc);
-        io.Fonts.ClearTexData();
     }
 
     private IntPtr RegisterTexture(ID3D11ShaderResourceView texture)
@@ -461,6 +464,7 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
         _depthStencilState = _device.CreateDepthStencilState(depthDesc);
 
         CreateFontsTexture();
+        CreateFontSampler();
     }
 
 #if false

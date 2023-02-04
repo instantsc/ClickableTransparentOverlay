@@ -9,6 +9,7 @@ internal class SampleOverlay : Overlay
 
     protected override Task PostInitialized()
     {
+            this.VSync = false;
         return Task.CompletedTask;
     }
 

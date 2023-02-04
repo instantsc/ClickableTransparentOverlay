@@ -3,6 +3,10 @@ using System.Numerics;
 using ClickableTransparentOverlay;
 using Coroutine;
 using ImGuiNET;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp;
+using System.Threading.Tasks;
+using System;
 
 namespace SingleThreadedOverlayWithCoroutines;
 
@@ -20,12 +24,33 @@ internal class SampleOverlay : Overlay
     private readonly Event _myevent = new();
     private readonly ActiveCoroutine _myRoutine1;
     private readonly ActiveCoroutine _myRoutine2;
+    private Image<Rgba32> _image = new(100, 100);
 
     public SampleOverlay()
         : base(true)
     {
         _myRoutine1 = CoroutineHandler.Start(TickServiceAsync(), name: "MyRoutine-1");
         _myRoutine2 = CoroutineHandler.Start(EventServiceAsync(), name: "MyRoutine-2");
+        CreateNewImageAtRuntime();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        _image.Dispose();
+        base.Dispose(disposing);
+    }
+
+    private void CreateNewImageAtRuntime()
+    {
+        Parallel.For(0, _image.Height, y =>
+        {
+            for (int x = 0; x < _image.Width; x++)
+            {
+                _image[x, y] = new Rgba32(Vector3.One * new Random().Next(0, 255));
+            }
+        });
+
+        _image.Save("foo.jpeg");
     }
 
     private IEnumerator<Wait> TickServiceAsync()
@@ -50,11 +75,6 @@ internal class SampleOverlay : Overlay
         }
     }
 
-    private static float _x = 0.0f;
-    private static float _y = 619.500f;
-    private static float _w = 351.0f;
-    private static float _h = 248.0f;
-
     protected override void Render()
     {
         CoroutineHandler.Tick(ImGui.GetIO().DeltaTime);
@@ -63,11 +83,6 @@ internal class SampleOverlay : Overlay
             CoroutineHandler.RaiseEvent(_myevent);
         }
 
-        ImGui.DragFloat("X", ref _x);
-        ImGui.DragFloat("Y", ref _y);
-        ImGui.DragFloat("W", ref _w);
-        ImGui.DragFloat("H", ref _h);
-        ImGui.GetBackgroundDrawList().AddRect(new Vector2(_x, _y), new Vector2(_x + _w, _y + _h), 0xFFFFFFFF);
         ImGui.Begin("Sample Overlay", ref _isRunning, ImGuiWindowFlags.AlwaysAutoResize);
         ImGui.Text($"Total Time/Delta Time: {ImGui.GetTime():F3}/{ImGui.GetIO().DeltaTime:F3}");
         ImGui.NewLine();
@@ -117,5 +132,8 @@ internal class SampleOverlay : Overlay
         {
             ImGui.ShowDemoWindow(ref _demoWindow);
         }
+
+        AddOrGetImagePointer("image", _image, true, out var handle);
+        ImGui.GetBackgroundDrawList().AddImage(handle, new Vector2(200f), new Vector2(300f));
     }
 }

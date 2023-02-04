@@ -5,7 +5,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -152,7 +151,11 @@ public abstract class Overlay : IDisposable
                     lpszClassName = "WndClass",
                 };
 
-                User32.RegisterClassEx(wndClass);
+                if (User32.RegisterClassEx(in wndClass) == 0)
+                {
+                    throw new Exception($"Failed to register window class {wndClass.lpszClassName}");
+                }
+
                 _window = new Win32Window(wndClass.lpszClassName, 800, 600, 0, 0, _title,
                     User32.WindowStyles.WS_POPUP, User32.WindowStylesEx.WS_EX_ACCEPTFILES | User32.WindowStylesEx.WS_EX_TOPMOST);
                 _renderer = new ImGuiRenderer(_device, _deviceContext, 800, 600);
