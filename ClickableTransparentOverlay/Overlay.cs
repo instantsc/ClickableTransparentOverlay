@@ -18,6 +18,7 @@ using Vortice.DXGI;
 using Vortice.Mathematics;
 using Point = System.Drawing.Point;
 using Size = System.Drawing.Size;
+using System.Runtime.InteropServices;
 
 namespace ClickableTransparentOverlay;
 
@@ -30,6 +31,7 @@ public abstract class Overlay : IDisposable
     private static readonly Color4 ClearColor = new Color4(0.0f);
     private const Format Format = Vortice.DXGI.Format.R8G8B8A8_UNorm;
 
+    private bool _sizeSet = false;
     private Win32Window _window;
     private ID3D11Device _device;
     private ID3D11DeviceContext _deviceContext;
@@ -156,11 +158,12 @@ public abstract class Overlay : IDisposable
                     throw new Exception($"Failed to register window class {wndClass.lpszClassName}");
                 }
 
-                _window = new Win32Window(wndClass.lpszClassName, 800, 600, 0, 0, _title,
+                _window = new Win32Window(wndClass.lpszClassName, 1, 1, 0, 0, _title,
                     User32.WindowStyles.WS_POPUP, User32.WindowStylesEx.WS_EX_ACCEPTFILES | User32.WindowStylesEx.WS_EX_TOPMOST);
-                _renderer = new ImGuiRenderer(_device, _deviceContext, 800, 600);
+                var windowMonitorInfo = WindowMonitorInfo;
+                _renderer = new ImGuiRenderer(_device, _deviceContext, windowMonitorInfo.rcWork.Width, windowMonitorInfo.rcWork.Height);
                 _inputHandler = new ImGuiInputHandler(_window.Handle);
-                User32.ShowWindow(_window.Handle, ShowWindowCommand.SW_MAXIMIZE);
+                User32.ShowWindow(_window.Handle, ShowWindowCommand.SW_NORMAL);
                 Utils.InitTransparency(_window.Handle);
                 _overlayReadyTcs.SetResult();
             }
@@ -299,6 +302,7 @@ public abstract class Overlay : IDisposable
         get => _window.Dimensions.Size;
         set
         {
+            _sizeSet = true;
             if (_window.Dimensions.Size != value)
             {
                 User32.MoveWindow(_window.Handle, _window.Dimensions.X, _window.Dimensions.Y, value.Width, value.Height, true);
@@ -308,6 +312,17 @@ public abstract class Overlay : IDisposable
     }
 
     public IntPtr? WindowHandle => _window?.Handle;
+
+    public User32.MONITORINFO WindowMonitorInfo
+    {
+        get
+        {
+            var monitor = User32.MonitorFromWindow(WindowHandle ?? new IntPtr(0), User32.MonitorFlags.MONITOR_DEFAULTTOPRIMARY);
+            var monitorInfo = new User32.MONITORINFO { cbSize = (uint)Marshal.SizeOf<User32.MONITORINFO>() };
+            User32.GetMonitorInfo(monitor, ref monitorInfo);
+            return monitorInfo;
+        }
+    }
 
     /// <summary>
     /// Gets the number of displays available on the computer.
@@ -552,10 +567,13 @@ public abstract class Overlay : IDisposable
                 {
                     case SizeMessage.SIZE_RESTORED:
                     case SizeMessage.SIZE_MAXIMIZED:
-                        var lp = (int)lParam;
-                        _window.Dimensions.Width = Utils.Loword(lp);
-                        _window.Dimensions.Height = Utils.Hiword(lp);
-                        OnResize();
+                        if (_sizeSet)
+                        {
+                            var lp = (int)lParam;
+                            _window.Dimensions.Width = Utils.Loword(lp);
+                            _window.Dimensions.Height = Utils.Hiword(lp);
+                            OnResize();
+                        }
                         break;
                 }
 
