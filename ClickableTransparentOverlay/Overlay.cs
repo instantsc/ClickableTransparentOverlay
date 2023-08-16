@@ -51,7 +51,7 @@ public abstract class Overlay : IDisposable
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly TaskCompletionSource _overlayReadyTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _overlayClosedTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly ConcurrentQueue<FontLoadDelegate> _fontUpdates = new();
+    private readonly ConcurrentQueue<(FontLoadDelegate action, TaskCompletionSource completion)> _fontUpdates = new();
     private readonly Queue<(WindowMessage msg, IntPtr wParam, IntPtr lParam)> _messageQueue = new();
     private readonly ConcurrentDictionary<string, (IntPtr Handle, uint Width, uint Height)> _loadedTexturePtrs = new();
 
@@ -245,7 +245,7 @@ public abstract class Overlay : IDisposable
             return false;
         }
 
-        _fontUpdates.Enqueue(_renderer.MakeFontLoadDelegate(pathName, size, null, language));
+        _fontUpdates.Enqueue((_renderer.MakeFontLoadDelegate(pathName, size, null, language), new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)));
         return true;
     }
 
@@ -263,13 +263,19 @@ public abstract class Overlay : IDisposable
             return false;
         }
 
-        _fontUpdates.Enqueue(_renderer.MakeFontLoadDelegate(pathName, size, glyphRange, null));
+        _fontUpdates.Enqueue((_renderer.MakeFontLoadDelegate(pathName, size, glyphRange, null), new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)));
         return true;
     }
 
-    public void ReplaceFont(FontLoadDelegate fontLoadDelegate)
+
+    /// <summary>
+    /// Returns a task that completes when the font update completes. Do not await in the render loop.
+    /// </summary>
+    public Task ReplaceFont(FontLoadDelegate fontLoadDelegate)
     {
-        _fontUpdates.Enqueue(fontLoadDelegate);
+        var taskCompletionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _fontUpdates.Enqueue((fontLoadDelegate, taskCompletionSource));
+        return taskCompletionSource.Task;
     }
 
     /// <summary>
@@ -512,7 +518,15 @@ public abstract class Overlay : IDisposable
     {
         while (_fontUpdates.TryDequeue(out var update))
         {
-            _renderer.UpdateFontTexture(update);
+            try
+            {
+                _renderer.UpdateFontTexture(update.action);
+                update.completion.TrySetResult();
+            }
+            catch (Exception ex)
+            {
+                update.completion.TrySetException(ex);
+            }
         }
     }
 
