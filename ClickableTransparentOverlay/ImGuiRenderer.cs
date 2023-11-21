@@ -112,7 +112,7 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
         var indexResourcePointer = (ImDrawIdx*)indexResource.DataPointer;
         for (var n = 0; n < data.CmdListsCount; n++)
         {
-            var cmdlList = data.CmdListsRange[n];
+            var cmdlList = data.CmdLists[n];
 
             var vertBytes = cmdlList.VtxBuffer.Size * sizeof(ImDrawVert);
             Buffer.MemoryCopy((void*)cmdlList.VtxBuffer.Data, vertexResourcePointer, vertBytes, vertBytes);
@@ -153,7 +153,7 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
         var globalVtxOffset = 0;
         for (var n = 0; n < data.CmdListsCount; n++)
         {
-            var cmdList = data.CmdListsRange[n];
+            var cmdList = data.CmdLists[n];
             for (var i = 0; i < cmdList.CmdBuffer.Size; i++)
             {
                 var cmd = cmdList.CmdBuffer[i];
@@ -361,11 +361,9 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
         {
             return texture;
         }
-        else
-        {
-            return null;
+
+        return null;
         }
-    }
 
     private void DeRegisterAllTexture()
     {

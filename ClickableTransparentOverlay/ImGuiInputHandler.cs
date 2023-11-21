@@ -50,6 +50,10 @@ internal class ImGuiInputHandler
         var io = ImGui.GetIO();
         switch (msg)
         {
+            case WindowMessage.SetFocus:
+            case WindowMessage.KillFocus:
+                io.AddFocusEvent(msg == WindowMessage.SetFocus);
+                break;
             case WindowMessage.LButtonDown:
             case WindowMessage.LButtonDoubleClick:
             case WindowMessage.LButtonUp:
@@ -76,7 +80,7 @@ internal class ImGuiInputHandler
                 io.AddMouseWheelEvent(0.0f, GET_WHEEL_DELTA_WPARAM(wParam) / WheelDelta);
                 break;
             case WindowMessage.MouseHWheel:
-                io.AddMouseWheelEvent(GET_WHEEL_DELTA_WPARAM(wParam) / WheelDelta, 0.0f);
+                io.AddMouseWheelEvent(-GET_WHEEL_DELTA_WPARAM(wParam) / WheelDelta, 0.0f);
                 break;
             case WindowMessage.KeyDown:
             case WindowMessage.SysKeyDown:
@@ -85,6 +89,11 @@ internal class ImGuiInputHandler
                 var isKeyDown = msg == WindowMessage.SysKeyDown || msg == WindowMessage.KeyDown;
                 if ((ulong)wParam < 256 && TryMapKey((VK)wParam, out var imguiKey))
                 {
+                    if (imguiKey == ImGuiKey.PrintScreen && !isKeyDown)
+                    {
+                        io.AddKeyEvent(imguiKey, true);
+                    }
+                    
                     io.AddKeyEvent(imguiKey, isKeyDown);
                 }
 
@@ -158,7 +167,7 @@ internal class ImGuiInputHandler
 
         result = key switch
         {
-            >= VK.F1 and <= VK.F12 => KeyToImGuiKeyShortcut(key, VK.F1, ImGuiKey.F1),
+            >= VK.F1 and <= VK.F24 => KeyToImGuiKeyShortcut(key, VK.F1, ImGuiKey.F1),
             >= VK.NUMPAD0 and <= VK.NUMPAD9 => KeyToImGuiKeyShortcut(key, VK.NUMPAD0, ImGuiKey.Keypad0),
             >= VK.KEY_A and <= VK.KEY_Z => KeyToImGuiKeyShortcut(key, VK.KEY_A, ImGuiKey.A),
             >= VK.KEY_0 and <= VK.KEY_9 => KeyToImGuiKeyShortcut(key, VK.KEY_0, ImGuiKey._0),
@@ -210,6 +219,8 @@ internal class ImGuiInputHandler
             VK.RMENU => ImGuiKey.RightAlt,
             VK.RWIN => ImGuiKey.RightSuper,
             VK.APPS => ImGuiKey.Menu,
+            VK.BROWSER_BACK => ImGuiKey.AppBack,
+            VK.BROWSER_FORWARD => ImGuiKey.AppForward,
             _ => ImGuiKey.None
         };
 
