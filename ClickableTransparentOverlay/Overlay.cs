@@ -493,7 +493,8 @@ public abstract class Overlay : IDisposable
             var deltaTime = (float)stopwatch.Elapsed.TotalSeconds;
             stopwatch.Restart();
             _window.PumpEvents();
-            if (Utils.SetOverlayClickable(_window.Handle, _inputHandler.Update()) == false)
+            if (Utils.SetOverlayClickable(_window.Handle, _inputHandler.Update()) == false && 
+                User32.GetForegroundWindow() == _window.Handle)
             {
                 FocusLost?.Invoke(this, EventArgs.Empty);
             }
