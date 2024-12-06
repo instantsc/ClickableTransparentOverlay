@@ -47,4 +47,6 @@ public enum FontGlyphRangeType
     /// Glyph range enough for english and few special chars.
     /// </summary>
     Cyrillic,
+
+    Full,
 }
