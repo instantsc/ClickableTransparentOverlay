@@ -83,7 +83,7 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
 
             _vertexBufferSize = data.TotalVtxCount + 5000;
             var desc = new BufferDescription(
-                _vertexBufferSize * sizeof(ImDrawVert),
+                (uint)(_vertexBufferSize * sizeof(ImDrawVert)),
                 BindFlags.VertexBuffer,
                 ResourceUsage.Dynamic,
                 CpuAccessFlags.Write);
@@ -97,7 +97,7 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
             _indexBufferSize = data.TotalIdxCount + 10000;
 
             var desc = new BufferDescription(
-                _indexBufferSize * sizeof(ImDrawIdx),
+                (uint)(_indexBufferSize * sizeof(ImDrawIdx)),
                 BindFlags.IndexBuffer,
                 ResourceUsage.Dynamic,
                 CpuAccessFlags.Write);
@@ -173,7 +173,7 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
                     ctx.PSSetShaderResource(0, texture);
                 }
 
-                ctx.DrawIndexed((int)cmd.ElemCount, (int)(cmd.IdxOffset + globalIdxOffset), (int)(cmd.VtxOffset + globalVtxOffset));
+                ctx.DrawIndexed(cmd.ElemCount, (uint)(cmd.IdxOffset + globalIdxOffset), (int)(cmd.VtxOffset + globalVtxOffset));
             }
 
             globalIdxOffset += cmdList.IdxBuffer.Size;
@@ -210,7 +210,7 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
 
     public IntPtr CreateImageTexture(Image<Rgba32> image, Format format)
     {
-        var texDesc = new Texture2DDescription(format, image.Width, image.Height, 1, 1);
+        var texDesc = new Texture2DDescription(format, (uint)image.Width, (uint)image.Height, 1, 1);
         Image<Rgba32>? imageCopy = null;
         try
         {
@@ -298,7 +298,7 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
         ctx.RSSetViewport(viewport);
         var stride = sizeof(ImDrawVert);
         ctx.IASetInputLayout(_inputLayout);
-        ctx.IASetVertexBuffer(0, _vertexBuffer, stride);
+        ctx.IASetVertexBuffer(0, _vertexBuffer, (uint)stride);
         ctx.IASetIndexBuffer(_indexBuffer, sizeof(ImDrawIdx) == 2 ? Format.R16_UInt : Format.R32_UInt, 0);
         ctx.IASetPrimitiveTopology(PrimitiveTopology.TriangleList);
         ctx.VSSetShader(_vertexShader);
@@ -319,7 +319,7 @@ internal sealed unsafe class ImGuiRenderer : IDisposable
     {
         var io = ImGui.GetIO();
         io.Fonts.GetTexDataAsRGBA32(out byte* pixels, out var width, out var height);
-        var texDesc = new Texture2DDescription(Format.R8G8B8A8_UNorm, width, height, 1, 1);
+        var texDesc = new Texture2DDescription(Format.R8G8B8A8_UNorm, (uint)width, (uint)height, 1, 1);
         var subResource = new SubresourceData(pixels, texDesc.Width * 4);
         using var texture = _device.CreateTexture2D(texDesc, new[] { subResource });
         var resViewDesc = new ShaderResourceViewDescription(

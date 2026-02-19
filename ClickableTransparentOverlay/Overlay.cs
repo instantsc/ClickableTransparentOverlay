@@ -153,7 +153,7 @@ public abstract class Overlay : IDisposable
                     lpszClassName = "WndClass",
                 };
 
-                if (User32.RegisterClassEx(in wndClass) == 0)
+                if (User32.RegisterClassEx(in wndClass).IsInvalid)
                 {
                     throw new Exception($"Failed to register window class {wndClass.lpszClassName}");
                 }
@@ -503,7 +503,7 @@ public abstract class Overlay : IDisposable
             _deviceContext.OMSetRenderTargets(_renderView);
             _deviceContext.ClearRenderTargetView(_renderView, ClearColor);
             _renderer.Render();
-            _swapChain.Present(VSync ? 1 : 0, PresentFlags.None);
+            _swapChain.Present(VSync ? 1u : 0, PresentFlags.None);
             ReplaceFontIfRequired();
             PostFrame();
         }
@@ -539,7 +539,7 @@ public abstract class Overlay : IDisposable
             var swapchainDesc = new SwapChainDescription()
             {
                 BufferCount = 1,
-                BufferDescription = new ModeDescription(_window.Dimensions.Width, _window.Dimensions.Height, Format),
+                BufferDescription = new ModeDescription((uint)_window.Dimensions.Width, (uint)_window.Dimensions.Height, Format),
                 Windowed = true,
                 OutputWindow = _window.Handle,
                 SampleDescription = new SampleDescription(1, 0),
@@ -558,7 +558,7 @@ public abstract class Overlay : IDisposable
             _renderView.Dispose();
             _backBuffer.Dispose();
 
-            _swapChain.ResizeBuffers(1, _window.Dimensions.Width, _window.Dimensions.Height, Format, SwapChainFlags.None);
+            _swapChain.ResizeBuffers(1, (uint)_window.Dimensions.Width, (uint)_window.Dimensions.Height, Format, SwapChainFlags.None);
 
             _backBuffer = _swapChain.GetBuffer<ID3D11Texture2D1>(0);
             _renderView = _device.CreateRenderTargetView(_backBuffer);
